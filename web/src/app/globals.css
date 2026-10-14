@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  --primary: #0f172a;
+  --primary-foreground: #f8fafc;
+
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #0f172a;
+
+  --radius: 0.5rem;
+
+  /* UI.MD Status Tokens */
+  --safe: oklch(0.62 0.15 150);
+  --safe-foreground: oklch(0.98 0 0);
+  --watch: oklch(0.80 0.16 85);
+  --watch-foreground: oklch(0.25 0.05 85);
+  --danger: oklch(0.58 0.22 27);
+  --danger-foreground: oklch(0.98 0 0);
+  --offline: oklch(0.60 0.02 260);
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+
+  --card: #121215;
+  --card-foreground: #f4f4f5;
+
+  --popover: #121215;
+  --popover-foreground: #f4f4f5;
+
+  --primary: #f4f4f5;
+  --primary-foreground: #09090b;
+
+  --secondary: #1f1f23;
+  --secondary-foreground: #f4f4f5;
+
+  --muted: #1c1c20;
+  --muted-foreground: #a1a1aa;
+
+  --accent: #1f1f23;
+  --accent-foreground: #f4f4f5;
+
+  --destructive: oklch(0.65 0.21 27);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #d4d4d8;
+
+  /* Dark UI.MD Status Tokens */
+  --safe: oklch(0.70 0.15 150);
+  --safe-foreground: oklch(0.1 0 0);
+  --watch: oklch(0.82 0.15 85);
+  --watch-foreground: oklch(0.15 0.05 85);
+  --danger: oklch(0.65 0.21 27);
+  --danger-foreground: oklch(0.98 0 0);
+  --offline: oklch(0.65 0.02 260);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular numbers for live telemetry */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Semantic utility classes */
+.bg-safe { background-color: var(--safe); }
+.text-safe { color: var(--safe); }
+.border-safe { border-color: var(--safe); }
+
+.bg-watch { background-color: var(--watch); }
+.text-watch { color: var(--watch-foreground); }
+.border-watch { border-color: var(--watch); }
+
+.bg-danger { background-color: var(--danger); }
+.text-danger { color: var(--danger-foreground); }
+.border-danger { border-color: var(--danger); }
+
+.bg-offline { background-color: var(--offline); }
+.text-offline { color: var(--offline); }
+.border-offline { border-color: var(--offline); }
+
+/* Animation subtle pulse */
+@keyframes danger-gentle-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.95; transform: scale(1.005); }
+}
+
+.animate-danger-pulse {
+  animation: danger-gentle-pulse 2s infinite ease-in-out;
+}

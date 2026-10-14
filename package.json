@@ -1,0 +1,16 @@
+{
+  "name": "gas-fire-monitor-pwa",
+  "version": "1.0.0",
+  "description": "IoT Gas, Smoke, and Fire Monitoring System with Solenoid Valve Control & PWA",
+  "private": true,
+  "scripts": {
+    "server": "npm --prefix server start",
+    "server:dev": "npm --prefix server run dev",
+    "web": "npm --prefix web dev",
+    "web:build": "npm --prefix web build",
+    "simulate": "node server/simulator/mock_esp32.js",
+    "simulate:leak": "node server/simulator/mock_esp32.js --leak",
+    "simulate:fire": "node server/simulator/mock_esp32.js --fire",
+    "simulate:offline": "node server/simulator/mock_esp32.js --offline"
+  }
+}
