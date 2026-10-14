@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { memoryStore, supabase } from './db.js';
 import { startWatchdogs } from './watchdog.js';
 import { generateIncidentSummary, handleAIChatQuery } from './ai.js';
+import { addPushSubscription, dispatchWebPushAlert } from './notifications.js';
 
 dotenv.config();
 
@@ -15,6 +16,18 @@ app.use(express.json());
 
 // Start safety watchdogs
 startWatchdogs();
+
+// ----------------------------------------------------------------------------
+// Web Push Subscription
+// ----------------------------------------------------------------------------
+app.post('/api/push/subscribe', (req, res) => {
+  const subscription = req.body;
+  if (!subscription || !subscription.endpoint) {
+    return res.status(400).json({ error: 'Invalid push subscription' });
+  }
+  addPushSubscription(subscription);
+  res.status(201).json({ success: true });
+});
 
 // ----------------------------------------------------------------------------
 // Health & Status
@@ -175,6 +188,9 @@ app.post('/api/readings', async (req, res) => {
           await supabase.from('alerts').insert([dangerAlert]);
           await supabase.from('events').insert([dangerEvent]);
         }
+
+        // Dispatch Web Push Notification to active browsers
+        dispatchWebPushAlert(dangerAlert).catch(err => console.error('Push error:', err));
       }
     } else if (isGasWatch || isTempWatch) {
       // Watch Alert Trigger
@@ -220,6 +236,9 @@ app.post('/api/readings', async (req, res) => {
           await supabase.from('alerts').insert([watchAlert]);
           await supabase.from('events').insert([watchEvent]);
         }
+
+        // Dispatch Web Push Notification to active browsers
+        dispatchWebPushAlert(watchAlert).catch(err => console.error('Push error:', err));
       }
     }
 
