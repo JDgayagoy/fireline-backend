@@ -1,4 +1,5 @@
 import { memoryStore, supabase } from './db.js';
+import { dispatchSMSEscalation } from './notifications.js';
 
 export function startWatchdogs() {
   console.log('🛡️ Starting Safety Watchdogs (60s Device Offline & Alert Escalation)...');
@@ -75,6 +76,12 @@ export function startWatchdogs() {
               actor: 'watchdog'
             };
             memoryStore.events.unshift(escalationEvent);
+
+            // Dispatch SMS to secondary escalation contact (priority > 1)
+            const escalationContact = memoryStore.contacts.find(c => c.priority > 1 && c.is_active) || memoryStore.contacts[1];
+            if (escalationContact) {
+              await dispatchSMSEscalation(escalationContact, alert);
+            }
 
             if (supabase) {
               await supabase.from('alerts').update({ escalated_at: alert.escalated_at }).eq('id', alert.id);

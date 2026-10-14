@@ -274,6 +274,61 @@ export default function SettingsView({
           <h3 className="text-base font-semibold text-zinc-100">Notifications & Quiet Hours</h3>
         </div>
 
+        {/* Web Push Subscription Action */}
+        <div className="p-3.5 rounded-lg bg-zinc-950/40 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span className="text-sm font-medium text-zinc-200 block">Web Push Notifications</span>
+            <span className="text-xs text-zinc-400">Receive real-time push alerts on your phone or desktop even when the app is in the background.</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const { enableWebPushNotifications } = await import('@/lib/notifications');
+                await enableWebPushNotifications();
+                alert('Web Push Notifications successfully enabled for this device!');
+              } catch (err) {
+                alert(`Web Push error: ${err.message}`);
+              }
+            }}
+            className="px-3.5 py-2 rounded-md text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 shrink-0 transition-colors"
+          >
+            Turn On Alerts
+          </button>
+        </div>
+
+        {/* Acoustic Chime Test */}
+        <div className="p-3.5 rounded-lg bg-zinc-950/40 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span className="text-sm font-medium text-zinc-200 block">In-Browser Acoustic Alarm</span>
+            <span className="text-xs text-zinc-400">Pulsing audio chime generated during Danger states.</span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={async () => {
+                const { playEmergencyAlarmChime } = await import('@/lib/notifications');
+                playEmergencyAlarmChime();
+              }}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/30 transition-colors"
+            >
+              Test Alarm
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const { stopEmergencyAlarmChime } = await import('@/lib/notifications');
+                stopEmergencyAlarmChime();
+              }}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+            >
+              Silence
+            </button>
+          </div>
+        </div>
+
         <div className="p-3 rounded-lg bg-zinc-950/40 border border-zinc-800/80 space-y-3">
           <div className="flex items-center justify-between">
             <div>

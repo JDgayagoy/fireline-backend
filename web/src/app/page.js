@@ -107,6 +107,15 @@ export default function App() {
     return () => clearInterval(timer);
   }, [syncData]);
 
+  useEffect(() => {
+    const hasActiveDanger = alerts.some(a => a.status === 'active' && a.level === 'danger');
+    if (hasActiveDanger) {
+      import('@/lib/notifications').then(n => n.playEmergencyAlarmChime()).catch(() => {});
+    } else {
+      import('@/lib/notifications').then(n => n.stopEmergencyAlarmChime()).catch(() => {});
+    }
+  }, [alerts]);
+
   // Actions
   const handleShutoffGas = async () => {
     await queueCommand('close_valve', isAdmin ? 'admin' : 'viewer');
@@ -119,6 +128,7 @@ export default function App() {
   };
 
   const handleAcknowledgeAlert = async (alertId) => {
+    import('@/lib/notifications').then(n => n.stopEmergencyAlarmChime()).catch(() => {});
     await acknowledgeAlert(alertId, isAdmin ? 'admin' : 'viewer');
     await syncData();
   };
