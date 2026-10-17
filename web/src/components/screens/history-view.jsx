@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Download, Flame, Wind, Thermometer, Layers, Calendar } from 'lucide-react';
+import { Download, Flame, Wind, Thermometer, Droplets, Layers } from 'lucide-react';
 
 export default function HistoryView({ readings = [], config = {} }) {
   const [timeframe, setTimeframe] = useState('hourly'); // 'hourly' | 'daily' | 'weekly'
-  const [sensorFilter, setSensorFilter] = useState('all'); // 'all' | 'gas' | 'smoke' | 'temp'
+  const [sensorFilter, setSensorFilter] = useState('all'); // 'all' | 'gas' | 'smoke' | 'temp' | 'humidity'
 
   // Filter and downsample readings based on timeframe
   const chartData = useMemo(() => {
@@ -18,21 +18,23 @@ export default function HistoryView({ readings = [], config = {} }) {
     return [...readings].slice(0, count).reverse().map((r, i) => ({
       index: i,
       time: new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      gas: Number(r.gas_ppm),
-      smoke: Number(r.smoke_level),
-      temp: Number(r.temperature)
+      gas: Number(r.gas_ppm || 0),
+      smoke: Number(r.smoke_level || 0),
+      temp: Number(r.temperature || 0),
+      humidity: Number(r.humidity !== undefined ? r.humidity : 55)
     }));
   }, [readings, timeframe]);
 
   // Export to CSV
   const handleExportCSV = () => {
     if (!readings || readings.length === 0) return;
-    const headers = ['Timestamp', 'Gas (PPM)', 'Smoke Index', 'Temperature (°C)', 'RSSI (dBm)', 'Uptime (s)'];
+    const headers = ['Timestamp', 'MQ-2 Gas (PPM)', 'MQ-2 Smoke (PPM)', 'DHT11 Temp (°C)', 'DHT11 Humidity (% RH)', 'RSSI (dBm)', 'Uptime (s)'];
     const rows = readings.map(r => [
       new Date(r.created_at).toISOString(),
       r.gas_ppm,
       r.smoke_level,
       r.temperature,
+      r.humidity !== undefined ? r.humidity : 55,
       r.rssi,
       r.uptime
     ]);
@@ -50,12 +52,12 @@ export default function HistoryView({ readings = [], config = {} }) {
   // SVG Chart Dimensions
   const svgWidth = 800;
   const svgHeight = 260;
-  const padding = { top: 20, right: 30, bottom: 30, left: 45 };
+  const padding = { top: 25, right: 30, bottom: 35, left: 45 };
   const graphWidth = svgWidth - padding.left - padding.right;
   const graphHeight = svgHeight - padding.top - padding.bottom;
 
   // Max scale calculation
-  const maxGasVal = Math.max(...chartData.map(d => d.gas), config.gas_danger_threshold || 300, 400);
+  const maxGasVal = Math.max(...chartData.map(d => Math.max(d.gas, d.smoke)), config.gas_danger_threshold || 300, 400);
 
   // Generate SVG polyline points
   const generatePoints = (key, maxVal) => {
@@ -70,43 +72,46 @@ export default function HistoryView({ readings = [], config = {} }) {
   const gasPoints = generatePoints('gas', maxGasVal);
   const smokePoints = generatePoints('smoke', maxGasVal);
   const tempPoints = generatePoints('temp', 100);
+  const humidityPoints = generatePoints('humidity', 100);
 
   // Threshold Y positions
   const gasWatchY = padding.top + graphHeight - ((config.gas_watch_threshold || 150) / maxGasVal) * graphHeight;
   const gasDangerY = padding.top + graphHeight - ((config.gas_danger_threshold || 300) / maxGasVal) * graphHeight;
+  const smokeDangerY = padding.top + graphHeight - ((config.smoke_danger_threshold || 250) / maxGasVal) * graphHeight;
+  const tempDangerY = padding.top + graphHeight - ((config.temp_danger_threshold || 60) / 100) * graphHeight;
 
   return (
     <div className="space-y-6">
       {/* Top Header & Export */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-zinc-100">Telemetry History & Analytics</h2>
-          <p className="text-xs text-zinc-400">High-resolution sensor logs with threshold reference baselines</p>
+          <h2 className="text-xl font-bold text-zinc-950">Sensor History & Analytics</h2>
+          <p className="text-xs text-zinc-400">MQ-2 (Gas, Smoke) and DHT11 (Temp, Humidity) telemetry logs</p>
         </div>
 
         <button
           type="button"
           onClick={handleExportCSV}
-          className="h-10 px-4 rounded-md font-medium text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center justify-center gap-2 transition-colors"
+          className="h-10 px-4 rounded-full font-bold text-xs bg-zinc-950 hover:bg-zinc-800 text-white shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
         >
-          <Download className="w-4 h-4 text-zinc-400" />
+          <Download className="w-4 h-4 text-zinc-300" />
           <span>Export CSV</span>
         </button>
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-lg bg-zinc-900/80 border border-zinc-800">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-white border border-zinc-200/80 shadow-sm">
         {/* Timeframe Tabs */}
-        <div className="flex rounded-md bg-zinc-950 p-1 border border-zinc-800/80">
+        <div className="flex rounded-xl bg-zinc-100 p-1 border border-zinc-200/60">
           {['hourly', 'daily', 'weekly'].map(t => (
             <button
               key={t}
               type="button"
               onClick={() => setTimeframe(t)}
-              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded text-xs font-medium capitalize transition-all ${
+              className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
                 timeframe === t 
-                  ? 'bg-zinc-800 text-white shadow-sm' 
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-zinc-950 text-white shadow-sm' 
+                  : 'text-zinc-500 hover:text-zinc-900'
               }`}
             >
               {t}
@@ -115,12 +120,13 @@ export default function HistoryView({ readings = [], config = {} }) {
         </div>
 
         {/* Sensor Toggle Group */}
-        <div className="flex rounded-md bg-zinc-950 p-1 border border-zinc-800/80">
+        <div className="flex rounded-xl bg-zinc-100 p-1 border border-zinc-200/60 overflow-x-auto">
           {[
-            { id: 'all', label: 'All', icon: Layers },
-            { id: 'gas', label: 'Gas', icon: Flame },
-            { id: 'smoke', label: 'Smoke', icon: Wind },
-            { id: 'temp', label: 'Temp', icon: Thermometer },
+            { id: 'all', label: 'All Sensors', icon: Layers },
+            { id: 'gas', label: 'MQ-2 Gas', icon: Flame },
+            { id: 'smoke', label: 'MQ-2 Smoke', icon: Wind },
+            { id: 'temp', label: 'DHT11 Temp', icon: Thermometer },
+            { id: 'humidity', label: 'DHT11 Humidity', icon: Droplets },
           ].map(s => {
             const Icon = s.icon;
             return (
@@ -128,13 +134,13 @@ export default function HistoryView({ readings = [], config = {} }) {
                 key={s.id}
                 type="button"
                 onClick={() => setSensorFilter(s.id)}
-                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
                   sensorFilter === s.id 
-                    ? 'bg-zinc-800 text-white shadow-sm' 
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-zinc-950 text-white shadow-sm' 
+                    : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className={`w-3.5 h-3.5 ${sensorFilter === s.id ? 'text-[#c8ff00]' : ''}`} />
                 <span>{s.label}</span>
               </button>
             );
@@ -143,35 +149,41 @@ export default function HistoryView({ readings = [], config = {} }) {
       </div>
 
       {/* Main Interactive Time-Series Chart */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 md:p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4 text-xs">
+      <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 shadow-smart-card">
+        <div className="flex flex-wrap items-center justify-between mb-4 gap-3">
+          <div className="flex flex-wrap items-center gap-4 text-xs">
             {(sensorFilter === 'all' || sensorFilter === 'gas') && (
-              <div className="flex items-center gap-1.5 font-medium text-red-400">
-                <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
-                <span>Gas (PPM)</span>
+              <div className="flex items-center gap-1.5 font-bold text-red-500">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
+                <span>MQ-2 Gas (PPM)</span>
               </div>
             )}
             {(sensorFilter === 'all' || sensorFilter === 'smoke') && (
-              <div className="flex items-center gap-1.5 font-medium text-amber-400">
-                <span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />
-                <span>Smoke Index</span>
+              <div className="flex items-center gap-1.5 font-bold text-amber-500">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+                <span>MQ-2 Smoke (PPM)</span>
               </div>
             )}
             {(sensorFilter === 'all' || sensorFilter === 'temp') && (
-              <div className="flex items-center gap-1.5 font-medium text-sky-400">
-                <span className="w-3 h-3 rounded-full bg-sky-400 inline-block" />
-                <span>Temp (°C)</span>
+              <div className="flex items-center gap-1.5 font-bold text-sky-500">
+                <span className="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block" />
+                <span>DHT11 Temp (°C)</span>
+              </div>
+            )}
+            {(sensorFilter === 'all' || sensorFilter === 'humidity') && (
+              <div className="flex items-center gap-1.5 font-bold text-purple-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
+                <span>DHT11 Humidity (% RH)</span>
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono hidden sm:flex">
+          <div className="flex items-center gap-3 text-[11px] text-zinc-400 font-mono">
             <span className="flex items-center gap-1">
-              <span className="w-2.5 h-0.5 bg-red-500 inline-block" /> Danger Threshold
+              <span className="w-2.5 h-0.5 bg-red-500 inline-block" /> Danger Limit
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2.5 h-0.5 bg-amber-500 inline-block" /> Watch Threshold
+              <span className="w-2.5 h-0.5 bg-amber-500 inline-block" /> Watch Limit
             </span>
           </div>
         </div>
@@ -189,16 +201,15 @@ export default function HistoryView({ readings = [], config = {} }) {
                   y1={y}
                   x2={svgWidth - padding.right}
                   y2={y}
-                  stroke="#27272a"
-                  strokeWidth="1"
+                  stroke="#f1f3f5"
+                  strokeWidth="1.5"
                 />
               );
             })}
 
-            {/* Threshold Reference Lines */}
+            {/* Threshold Reference Lines for Gas */}
             {(sensorFilter === 'all' || sensorFilter === 'gas') && (
               <>
-                {/* Danger Reference Line */}
                 <line
                   x1={padding.left}
                   y1={gasDangerY}
@@ -208,11 +219,10 @@ export default function HistoryView({ readings = [], config = {} }) {
                   strokeWidth="1.5"
                   strokeDasharray="4 4"
                 />
-                <text x={svgWidth - padding.right} y={gasDangerY - 4} fill="#ef4444" fontSize="10" textAnchor="end" className="font-mono">
-                  Gas Danger ({config.gas_danger_threshold} PPM)
+                <text x={svgWidth - padding.right} y={gasDangerY - 4} fill="#ef4444" fontSize="10" textAnchor="end" className="font-mono font-bold">
+                  Gas Danger ({config.gas_danger_threshold || 300} PPM)
                 </text>
 
-                {/* Watch Reference Line */}
                 <line
                   x1={padding.left}
                   y1={gasWatchY}
@@ -222,26 +232,76 @@ export default function HistoryView({ readings = [], config = {} }) {
                   strokeWidth="1.5"
                   strokeDasharray="4 4"
                 />
-                <text x={svgWidth - padding.right} y={gasWatchY - 4} fill="#f59e0b" fontSize="10" textAnchor="end" className="font-mono">
-                  Gas Watch ({config.gas_watch_threshold} PPM)
+                <text x={svgWidth - padding.right} y={gasWatchY - 4} fill="#f59e0b" fontSize="10" textAnchor="end" className="font-mono font-bold">
+                  Gas Watch ({config.gas_watch_threshold || 150} PPM)
+                </text>
+              </>
+            )}
+
+            {/* Threshold Reference Lines for Smoke */}
+            {sensorFilter === 'smoke' && (
+              <>
+                <line
+                  x1={padding.left}
+                  y1={smokeDangerY}
+                  x2={svgWidth - padding.right}
+                  y2={smokeDangerY}
+                  stroke="#ef4444"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                />
+                <text x={svgWidth - padding.right} y={smokeDangerY - 4} fill="#ef4444" fontSize="10" textAnchor="end" className="font-mono font-bold">
+                  Smoke Danger ({config.smoke_danger_threshold || 250} PPM)
+                </text>
+              </>
+            )}
+
+            {/* Threshold Reference Lines for Temp */}
+            {sensorFilter === 'temp' && (
+              <>
+                <line
+                  x1={padding.left}
+                  y1={tempDangerY}
+                  x2={svgWidth - padding.right}
+                  y2={tempDangerY}
+                  stroke="#ef4444"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                />
+                <text x={svgWidth - padding.right} y={tempDangerY - 4} fill="#ef4444" fontSize="10" textAnchor="end" className="font-mono font-bold">
+                  Temp Danger ({config.temp_danger_threshold || 60}°C)
                 </text>
               </>
             )}
 
             {/* Data Paths */}
+            {(sensorFilter === 'all' || sensorFilter === 'humidity') && humidityPoints && (
+              <polyline
+                fill="none"
+                stroke="#8b5cf6"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={humidityPoints}
+              />
+            )}
             {(sensorFilter === 'all' || sensorFilter === 'smoke') && smokePoints && (
               <polyline
                 fill="none"
                 stroke="#f59e0b"
-                strokeWidth="2"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 points={smokePoints}
               />
             )}
             {(sensorFilter === 'all' || sensorFilter === 'temp') && tempPoints && (
               <polyline
                 fill="none"
-                stroke="#38bdf8"
-                strokeWidth="2"
+                stroke="#0ea5e9"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 points={tempPoints}
               />
             )}
@@ -250,6 +310,8 @@ export default function HistoryView({ readings = [], config = {} }) {
                 fill="none"
                 stroke="#ef4444"
                 strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 points={gasPoints}
               />
             )}
@@ -257,10 +319,10 @@ export default function HistoryView({ readings = [], config = {} }) {
             {/* Time labels on X Axis */}
             {chartData.length > 0 && (
               <>
-                <text x={padding.left} y={svgHeight - 10} fill="#71717a" fontSize="11" className="font-mono">
+                <text x={padding.left} y={svgHeight - 10} fill="#9ca3af" fontSize="11" className="font-mono font-medium">
                   {chartData[0].time}
                 </text>
-                <text x={svgWidth - padding.right} y={svgHeight - 10} fill="#71717a" fontSize="11" textAnchor="end" className="font-mono">
+                <text x={svgWidth - padding.right} y={svgHeight - 10} fill="#9ca3af" fontSize="11" textAnchor="end" className="font-mono font-medium">
                   {chartData[chartData.length - 1].time}
                 </text>
               </>

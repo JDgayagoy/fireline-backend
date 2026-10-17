@@ -6,11 +6,11 @@ import { Wifi, WifiOff, Clock } from 'lucide-react';
 export default function ConnectionBadge({ online, secondsSinceLastReading, offlineTimeout = 60 }) {
   if (!online || (secondsSinceLastReading !== null && secondsSinceLastReading > offlineTimeout)) {
     return (
-      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
+      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-500 border border-zinc-200/80 shadow-sm">
         <WifiOff className="w-3.5 h-3.5 text-zinc-400" />
         <span>Offline</span>
         {secondsSinceLastReading !== null && (
-          <span className="text-[10px] text-zinc-500 font-mono">({secondsSinceLastReading}s ago)</span>
+          <span className="text-[10px] text-zinc-400 font-mono">({secondsSinceLastReading}s)</span>
         )}
       </div>
     );
@@ -18,8 +18,8 @@ export default function ConnectionBadge({ online, secondsSinceLastReading, offli
 
   if (secondsSinceLastReading !== null && secondsSinceLastReading > 10) {
     return (
-      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
-        <Clock className="w-3.5 h-3.5 text-amber-400" />
+      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm">
+        <Clock className="w-3.5 h-3.5 text-amber-500" />
         <span>Stale</span>
         <span className="text-[10px] font-mono">({secondsSinceLastReading}s)</span>
       </div>
@@ -27,12 +27,12 @@ export default function ConnectionBadge({ online, secondsSinceLastReading, offli
   }
 
   return (
-    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-white text-zinc-800 border border-zinc-200/80 shadow-sm">
       <span className="relative flex h-2 w-2">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c8ff00] opacity-90"></span>
         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
       </span>
-      <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+      <Wifi className="w-3.5 h-3.5 text-zinc-600" />
       <span>Live</span>
     </div>
   );

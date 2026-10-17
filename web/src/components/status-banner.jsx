@@ -23,6 +23,7 @@ export default function StatusBanner({
     gasPPM: latestReading?.gas_ppm,
     temperature: latestReading?.temperature,
     smokeLevel: latestReading?.smoke_level,
+    humidity: latestReading?.humidity,
     config
   });
 
@@ -58,33 +59,33 @@ export default function StatusBanner({
     return (
       <div 
         role="alert" 
-        className="w-full rounded-lg border-2 border-red-600 bg-red-950/40 p-4 md:p-5 text-red-100 shadow-xl animate-danger-pulse mb-6"
+        className="w-full rounded-[24px] border-2 border-red-500 bg-red-50 p-4 md:p-5 text-red-950 shadow-xl animate-danger-pulse mb-6"
       >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
-            <div className="p-2.5 rounded-full bg-red-600 text-white shrink-0 mt-0.5">
+            <div className="p-2.5 rounded-full bg-red-600 text-white shrink-0 mt-0.5 shadow-md">
               <Flame className="w-6 h-6 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-xs font-bold tracking-wider uppercase bg-red-600 text-white">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase bg-red-600 text-white">
                   Danger State
                 </span>
                 {countdownSeconds !== null && countdownSeconds > 0 && (
-                  <span className="text-xs text-red-300 font-mono">
+                  <span className="text-xs text-red-700 font-mono font-semibold">
                     Escalates to SMS in {formatCountdown(countdownSeconds)}
                   </span>
                 )}
                 {countdownSeconds === 0 && (
-                  <span className="text-xs text-red-300 font-semibold">
+                  <span className="text-xs text-red-700 font-bold">
                     Escalated to SMS Contacts
                   </span>
                 )}
               </div>
-              <h2 className="text-lg md:text-xl font-bold mt-1 text-red-200">
+              <h2 className="text-lg md:text-xl font-bold mt-1 text-red-950">
                 {triggerMsg}
               </h2>
-              <p className="text-sm text-red-300/90 mt-0.5">
+              <p className="text-sm text-red-800/90 mt-0.5">
                 Immediate action required: Ventilate area, confirm valve closure, and evacuate if necessary.
               </p>
             </div>
@@ -95,7 +96,7 @@ export default function StatusBanner({
               <button
                 type="button"
                 onClick={() => onAcknowledge(activeAlert.id)}
-                className="flex-1 md:flex-initial h-11 px-5 rounded-md font-semibold bg-zinc-100 hover:bg-white text-zinc-950 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
+                className="flex-1 md:flex-initial h-11 px-5 rounded-full font-bold bg-white hover:bg-zinc-100 text-zinc-950 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-sm border border-zinc-200"
               >
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 Acknowledge Alert
@@ -104,7 +105,7 @@ export default function StatusBanner({
             <button
               type="button"
               onClick={onShutoffClick}
-              className="flex-1 md:flex-initial h-11 px-5 rounded-md font-semibold bg-red-600 hover:bg-red-700 text-white shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
+              className="flex-1 md:flex-initial h-11 px-5 rounded-full font-bold bg-red-600 hover:bg-red-700 text-white shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
             >
               <AlertOctagon className="w-4 h-4" />
               Shut Off Gas
@@ -122,21 +123,21 @@ export default function StatusBanner({
     return (
       <div 
         role="alert" 
-        className="w-full rounded-lg border border-amber-500/50 bg-amber-950/30 p-4 text-amber-100 shadow-md mb-6"
+        className="w-full rounded-[24px] border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-md mb-6"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-full bg-amber-500 text-zinc-950 shrink-0 mt-0.5">
-              <TriangleAlert className="w-5 h-5" />
+            <div className="p-2 rounded-full bg-amber-500 text-zinc-950 shrink-0 mt-0.5 shadow-sm">
+              <TriangleAlert className="w-5 h-5 text-zinc-950" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-xs font-bold tracking-wide uppercase bg-amber-500 text-zinc-950">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide uppercase bg-amber-500 text-zinc-950">
                   Watch
                 </span>
-                <span className="text-xs text-amber-300">Monitored Threshold Exceeded</span>
+                <span className="text-xs text-amber-800 font-medium">Monitored Threshold Exceeded</span>
               </div>
-              <h3 className="text-base font-semibold mt-1 text-amber-200">
+              <h3 className="text-base font-bold mt-1 text-amber-950">
                 {triggerMsg}
               </h3>
             </div>
@@ -147,7 +148,7 @@ export default function StatusBanner({
               <button
                 type="button"
                 onClick={() => onAcknowledge(activeAlert.id)}
-                className="h-10 px-4 rounded-md font-medium bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-all text-xs"
+                className="h-10 px-4 rounded-full font-bold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-all text-xs shadow-sm"
               >
                 Acknowledge
               </button>
@@ -156,7 +157,7 @@ export default function StatusBanner({
               <button
                 type="button"
                 onClick={() => onMarkFalseAlarm(activeAlert.id)}
-                className="h-10 px-3 rounded-md font-medium bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-all text-xs flex items-center gap-1.5"
+                className="h-10 px-3 rounded-full font-semibold bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-200 transition-all text-xs flex items-center gap-1.5 shadow-sm"
               >
                 <HelpCircle className="w-3.5 h-3.5" />
                 False Alarm?
@@ -173,22 +174,22 @@ export default function StatusBanner({
     return (
       <div 
         role="status" 
-        className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 text-zinc-200 shadow-sm mb-6"
+        className="w-full rounded-[24px] border border-zinc-200/80 bg-white p-4 text-zinc-800 shadow-smart-card mb-6"
       >
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-full bg-zinc-800 text-zinc-400 shrink-0">
+          <div className="p-2 rounded-full bg-zinc-100 text-zinc-500 shrink-0">
             <WifiOff className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-xs font-medium uppercase bg-zinc-800 text-zinc-400 border border-zinc-700">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase bg-zinc-100 text-zinc-600 border border-zinc-200">
                 Device Offline
               </span>
-              <span className="text-xs text-zinc-400">
+              <span className="text-xs text-zinc-500">
                 No signal received for {secondsSinceLastReading ? `${secondsSinceLastReading}s` : 'a while'}
               </span>
             </div>
-            <p className="text-sm text-zinc-300 mt-1">
+            <p className="text-sm text-zinc-600 mt-1">
               {overall.message} Cached telemetry displayed. Standalone safety fail-safe remains active on hardware.
             </p>
           </div>
@@ -197,28 +198,6 @@ export default function StatusBanner({
     );
   }
 
-  // 4. SAFE STATE (Calm, low contrast per UI.MD)
-  return (
-    <div 
-      role="status" 
-      className="w-full rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-3.5 md:p-4 text-emerald-100 shadow-sm mb-6 flex items-center justify-between"
-    >
-      <div className="flex items-center gap-3">
-        <div className="p-1.5 rounded-full bg-emerald-600/20 text-emerald-400 shrink-0">
-          <ShieldCheck className="w-5 h-5 text-emerald-400" />
-        </div>
-        <div>
-          <span className="text-sm font-medium text-emerald-200">
-            All systems normal.
-          </span>
-          <span className="text-xs text-emerald-400/80 ml-2 hidden sm:inline">
-            Sensors operating within safe thresholds. Updated {secondsSinceLastReading ?? 3}s ago.
-          </span>
-        </div>
-      </div>
-      <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-        Safe
-      </span>
-    </div>
-  );
+  // 4. SAFE STATE (Calm, quiet per UI.MD - hero environmental card serves as the normal state)
+  return null;
 }

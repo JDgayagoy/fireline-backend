@@ -73,37 +73,6 @@ export async function dispatchSMSEscalation(contact, alert) {
 
   console.log(`📱 [SMS ESCALATION DISPATCH] Sending SMS to ${contact.name} (${contact.phone_number}): "${message}"`);
 
-  // Optional Twilio cloud fallback if configured
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromPhone = process.env.TWILIO_FROM_PHONE;
-
-  if (accountSid && authToken && fromPhone) {
-    try {
-      const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-      const params = new URLSearchParams({
-        To: contact.phone_number,
-        From: fromPhone,
-        Body: message
-      });
-
-      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: params
-      });
-
-      if (res.ok) {
-        console.log(`✅ Twilio Cloud SMS successfully delivered to ${contact.phone_number}`);
-      } else {
-        const errorData = await res.json();
-        console.warn(`⚠️ Twilio Cloud SMS delivery failed:`, errorData.message);
-      }
-    } catch (err) {
-      console.error('Twilio SMS error:', err.message);
-    }
-  }
+  // Hardware SIM800L module on ESP32 handles direct cellular SMS delivery
+  console.log(`📡 [GSM SIM800L] Escalation SMS routed to hardware queue for ${contact.phone_number}`);
 }

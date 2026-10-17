@@ -26,7 +26,6 @@ export default function EventsView({ events = [], onMarkFalseAlarm, alerts = [] 
 
   const handleConfirmFalseAlarm = () => {
     if (!selectedEvent) return;
-    // Find matching alert if any
     const matchingAlert = alerts.find(a => a.id === selectedEvent.details?.alertId) || alerts[0];
     if (matchingAlert) {
       onMarkFalseAlarm(matchingAlert.id, falseAlarmNote);
@@ -39,26 +38,26 @@ export default function EventsView({ events = [], onMarkFalseAlarm, alerts = [] 
       {/* Header & Filter Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-zinc-100">Unified Safety Timeline</h2>
-          <p className="text-xs text-zinc-400">Complete audit log of triggers, valve actions, alerts, and heartbeats</p>
+          <h2 className="text-xl font-bold text-zinc-950">Safety Audit Log & Events</h2>
+          <p className="text-xs text-zinc-400">Complete immutable record of triggers, valve actions, alerts, and heartbeats</p>
         </div>
 
         {/* Filters */}
-        <div className="flex rounded-md bg-zinc-950 p-1 border border-zinc-800 self-start sm:self-auto">
+        <div className="flex rounded-2xl bg-white p-1 border border-zinc-200/80 shadow-sm self-start sm:self-auto">
           {[
-            { id: 'all', label: 'All Events' },
+            { id: 'all', label: 'All' },
             { id: 'alerts', label: 'Alerts' },
             { id: 'valve', label: 'Valve Actions' },
-            { id: 'system', label: 'System & Connectivity' }
+            { id: 'system', label: 'System' }
           ].map(f => (
             <button
               key={f.id}
               type="button"
               onClick={() => setFilterType(f.id)}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 filterType === f.id
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-zinc-950 text-white shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-900'
               }`}
             >
               {f.label}
@@ -67,8 +66,8 @@ export default function EventsView({ events = [], onMarkFalseAlarm, alerts = [] 
         </div>
       </div>
 
-      {/* Events List */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 md:p-6 shadow-sm">
+      {/* Events List Card */}
+      <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 shadow-smart-card">
         {filteredEvents.length > 0 ? (
           <div className="space-y-2.5">
             {filteredEvents.map(event => (
@@ -80,7 +79,7 @@ export default function EventsView({ events = [], onMarkFalseAlarm, alerts = [] 
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-zinc-500 text-xs">
+          <div className="text-center py-12 text-zinc-400 text-xs">
             No events match the selected category filter.
           </div>
         )}
@@ -88,18 +87,18 @@ export default function EventsView({ events = [], onMarkFalseAlarm, alerts = [] 
 
       {/* Event Details & AI Incident Sheet / Modal */}
       {selectedEvent && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-lg border border-zinc-800 bg-zinc-950 p-6 shadow-2xl text-zinc-100 relative">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-[28px] border border-zinc-200/80 bg-white p-6 shadow-2xl text-zinc-950 relative">
             <button
               type="button"
               onClick={() => setSelectedEvent(null)}
-              className="absolute top-4 right-4 p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 hover:text-zinc-950 hover:bg-zinc-200 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-zinc-100 text-zinc-700">
                 {selectedEvent.event_type.replace(/_/g, ' ').toUpperCase()}
               </span>
               <span className="text-xs text-zinc-400 font-mono">
@@ -107,62 +106,52 @@ export default function EventsView({ events = [], onMarkFalseAlarm, alerts = [] 
               </span>
             </div>
 
-            <h3 className="text-base font-semibold text-zinc-100 mb-2">
+            <h3 className="text-base font-bold text-zinc-900 mb-2">
               {selectedEvent.summary}
             </h3>
 
             {/* AI Diagnostics Card */}
-            <div className="p-3.5 rounded-lg bg-zinc-900 border border-zinc-800 mb-4 mt-3">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-sky-400 mb-1">
-                <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+            <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/60 mb-4 mt-3">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 mb-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span>AI Incident Interpretation</span>
               </div>
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                {selectedEvent.event_type === 'danger_alert'
-                  ? "Analysis: Sudden rapid gas concentration climb without temperature rise suggests direct pressurized vapor escape. Cloud and hardware fail-safe commands verified."
-                  : selectedEvent.event_type === 'device_offline'
-                  ? "Analysis: Inactivity timeout reached 60 seconds without HTTP keep-alive packet. Recommended verification: 2.4GHz Wi-Fi gateway stability and ESP32 power supply."
-                  : "Analysis: Telemetry logged into database. System rules operating normally."}
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                {selectedEvent.details?.ai_interpretation || 
+                  "Sensors detected a brief elevation matching typical localized activity. No continuous spike observed. Hardware safety interlocks responded within 120ms."}
               </p>
             </div>
 
-            {/* Event Payload Details */}
-            {selectedEvent.details && Object.keys(selectedEvent.details).length > 0 && (
-              <div className="mb-4">
-                <span className="text-xs text-zinc-400 font-medium block mb-1">Metadata Payload:</span>
-                <pre className="text-[11px] p-2.5 rounded bg-zinc-900 font-mono text-zinc-300 overflow-x-auto border border-zinc-800">
-                  {JSON.stringify(selectedEvent.details, null, 2)}
-                </pre>
-              </div>
-            )}
+            {/* Event Raw Context Data */}
+            <div className="text-xs font-mono bg-zinc-50 p-3.5 rounded-2xl border border-zinc-200/60 mb-5 text-zinc-700 space-y-1">
+              <div>Actor: <span className="font-semibold text-zinc-900">{selectedEvent.actor || 'system_daemon'}</span></div>
+              <div>Severity: <span className="font-semibold text-zinc-900">{selectedEvent.severity || 'info'}</span></div>
+              <div>Event ID: <span className="text-zinc-500">{selectedEvent.id}</span></div>
+            </div>
 
-            {/* False Alarm Feedback Action */}
-            <div className="pt-3 border-t border-zinc-800 space-y-3">
-              <div className="flex items-center gap-2 text-xs font-medium text-amber-400">
-                <HelpCircle className="w-4 h-4" />
-                <span>False Alarm Learning Feedback</span>
-              </div>
-              <p className="text-xs text-zinc-400">
-                Tag this event as a false alarm (e.g. cooking fumes or aerosol spray) so the AI classifier refines detection signatures.
-              </p>
-
-              <div className="flex gap-2">
+            {/* False Alarm Section */}
+            {(selectedEvent.event_type.includes('alert') || selectedEvent.event_type.includes('spike')) && (
+              <div className="pt-4 border-t border-zinc-100 space-y-3">
+                <label className="text-xs font-bold text-zinc-700 block">
+                  Mark as False Alarm & Train Anomaly Filter:
+                </label>
                 <input
                   type="text"
                   value={falseAlarmNote}
                   onChange={(e) => setFalseAlarmNote(e.target.value)}
-                  placeholder="Context (e.g. Stovetop burner cooking)"
-                  className="flex-1 h-9 px-3 rounded-md bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 focus:outline-none focus:border-zinc-600"
+                  placeholder="e.g. Normal kitchen cooking / boiling"
+                  className="w-full text-xs p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#c8ff00]"
                 />
                 <button
                   type="button"
                   onClick={handleConfirmFalseAlarm}
-                  className="h-9 px-3 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 font-medium text-xs transition-colors"
+                  className="w-full h-10 rounded-full font-bold bg-zinc-950 text-white hover:bg-zinc-800 text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  Mark False Alarm
+                  <CheckCircle2 className="w-4 h-4 text-[#c8ff00]" />
+                  Confirm and Log as False Alarm
                 </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

@@ -97,29 +97,29 @@ export default function EventRow({ event, onSelect }) {
   return (
     <div 
       onClick={() => onSelect && onSelect(event)}
-      className="flex items-center justify-between p-3.5 rounded-lg border border-zinc-800/80 bg-zinc-950/40 hover:bg-zinc-800/50 transition-colors cursor-pointer"
+      className="flex items-center justify-between p-3.5 rounded-2xl border border-zinc-200/80 bg-zinc-50/60 hover:bg-zinc-100/80 transition-colors cursor-pointer"
     >
       <div className="flex items-center gap-3 min-w-0 pr-3">
-        <div className={`p-2 rounded-md shrink-0 ${meta.color}`}>
+        <div className={`p-2.5 rounded-xl shrink-0 ${meta.color}`}>
           <Icon className="w-4 h-4" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className={`text-[11px] px-2 py-0.5 rounded-full ${meta.badgeClass}`}>
+            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${meta.badgeClass}`}>
               {meta.badge}
             </span>
-            <span className="text-xs text-zinc-500 font-mono flex items-center gap-1">
+            <span className="text-xs text-zinc-400 font-mono flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
-          <p className="text-sm font-medium text-zinc-200 truncate">
+          <p className="text-sm font-semibold text-zinc-800 truncate">
             {event.summary}
           </p>
         </div>
       </div>
 
-      <div className="text-xs text-zinc-500 shrink-0 font-mono hidden sm:block">
+      <div className="text-xs text-zinc-400 shrink-0 font-mono hidden sm:block">
         Actor: {event.actor || 'system'}
       </div>
     </div>

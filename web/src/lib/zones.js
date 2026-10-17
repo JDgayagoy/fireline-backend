@@ -31,14 +31,22 @@ export function getOverallZone({
 
   const gasDanger = config.gas_danger_threshold || 300;
   const tempDanger = config.temp_danger_threshold || 60;
+  const smokeDanger = config.smoke_danger_threshold || 250;
   const gasWatch = config.gas_watch_threshold || 150;
   const tempWatch = config.temp_watch_threshold || 45;
+  const smokeWatch = config.smoke_watch_threshold || 100;
+  const humidityWatch = config.humidity_watch_threshold || 80;
 
-  // 2. Check Danger Thresholds
-  if (gasPPM >= gasDanger || temperature >= tempDanger) {
-    const trigger = gasPPM >= gasDanger
-      ? `Gas level reached ${gasPPM} PPM (limit: ${gasDanger})`
-      : `Temperature reached ${temperature}°C (limit: ${tempDanger}°C)`;
+  // 2. Check Danger Thresholds (MQ-2 Gas, MQ-2 Smoke, DHT11 Temperature)
+  if (gasPPM >= gasDanger || temperature >= tempDanger || smokeLevel >= smokeDanger) {
+    let trigger = '';
+    if (gasPPM >= gasDanger) {
+      trigger = `MQ-2 Gas Leak reached ${gasPPM} PPM (limit: ${gasDanger} PPM)`;
+    } else if (smokeLevel >= smokeDanger) {
+      trigger = `MQ-2 Smoke Level reached ${smokeLevel} PPM (limit: ${smokeDanger} PPM)`;
+    } else {
+      trigger = `DHT11 Temperature reached ${temperature}°C (limit: ${tempDanger}°C)`;
+    }
 
     return {
       zone: 'danger',
@@ -54,10 +62,17 @@ export function getOverallZone({
   }
 
   // 3. Check Watch Thresholds
-  if (gasPPM >= gasWatch || temperature >= tempWatch) {
-    const trigger = gasPPM >= gasWatch
-      ? `Gas elevated at ${gasPPM} PPM (watch: ${gasWatch})`
-      : `Temperature elevated at ${temperature}°C (watch: ${tempWatch}°C)`;
+  if (gasPPM >= gasWatch || temperature >= tempWatch || smokeLevel >= smokeWatch || (config.humidity && config.humidity >= humidityWatch)) {
+    let trigger = '';
+    if (gasPPM >= gasWatch) {
+      trigger = `MQ-2 Gas elevated at ${gasPPM} PPM (watch: ${gasWatch} PPM)`;
+    } else if (smokeLevel >= smokeWatch) {
+      trigger = `MQ-2 Smoke elevated at ${smokeLevel} PPM (watch: ${smokeWatch} PPM)`;
+    } else if (temperature >= tempWatch) {
+      trigger = `DHT11 Temperature elevated at ${temperature}°C (watch: ${tempWatch}°C)`;
+    } else {
+      trigger = `DHT11 Humidity elevated at ${config.humidity}% (watch: ${humidityWatch}%)`;
+    }
 
     return {
       zone: 'watch',
@@ -77,7 +92,7 @@ export function getOverallZone({
     zone: 'safe',
     label: 'Safe',
     icon: 'ShieldCheck',
-    message: 'All clear. Sensors operating normally within safe baselines.',
+    message: 'All clear. MQ-2 and DHT11 sensors operating normally within safe baselines.',
     bgClass: 'bg-emerald-500/15',
     borderClass: 'border-emerald-500/40',
     textClass: 'text-emerald-500',
