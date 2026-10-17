@@ -25,6 +25,39 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Required for PWA Installability (Chrome/Edge criteria) & Offline Shell
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+
+  // Bypass cache for live telemetry API requests
+  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/status') || url.pathname.startsWith('/readings')) {
+    return;
+  }
+
+  event.respondWith(
+    fetch(event.request)
+      .then((networkResponse) => {
+        // Cache successful local GET requests
+        if (networkResponse && networkResponse.status === 200 && event.request.url.startsWith(self.location.origin)) {
+          const cloned = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            return caches.match('/');
+          }
+          return new Response('Network offline', { status: 503, statusText: 'Offline' });
+        });
+      })
+  );
+});
+
 // ----------------------------------------------------------------------------
 // Web Push Notifications
 // ----------------------------------------------------------------------------

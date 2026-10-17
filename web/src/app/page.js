@@ -17,6 +17,7 @@ import {
   ListTodo
 } from 'lucide-react';
 import ConnectionBadge from '../components/connection-badge';
+import PwaInstaller from '../components/pwa-installer';
 import DashboardView from '../components/screens/dashboard-view';
 import HistoryView from '../components/screens/history-view';
 import EventsView from '../components/screens/events-view';
@@ -309,6 +310,7 @@ export default function App() {
 
           {/* Header Right Actions */}
           <div className="flex items-center gap-2.5">
+            <PwaInstaller />
             <ConnectionBadge 
               online={status.online} 
               secondsSinceLastReading={status.secondsSinceLastReading}
