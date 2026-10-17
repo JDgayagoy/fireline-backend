@@ -1,34 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🔥 FireLine Gas & Fire Safety PWA
 
-## Getting Started
+A mobile-first, high-performance Progressive Web App (PWA) built with **Next.js (Turbopack)** and **Tailwind CSS** for real-time monitoring of LPG gas leaks (MQ-2) and environmental temperature/humidity (DHT11), with remote solenoid valve safety controls.
 
-First, run the development server:
+## 🚀 Features
+- **Live Environmental Gauges:** Instant telemetry for MQ-2 gas, MQ-2 smoke, and DHT11 temp & humidity.
+- **Safety Status Banner:** Real-time Danger, Watch, Safe, and Offline status indicator.
+- **Remote Actuator Control:** Hold-to-confirm emergency LPG solenoid valve remote shutoff.
+- **Device Health & Telemetry:** Monitors ESP32 MCU link, Wi-Fi RSSI, uptime, and SIM800L cellular readiness.
+- **AI Safety Assistant:** Incident summarization and conversational safety diagnostics.
+- **PWA Installation:** Installable on iOS (Safari Add to Home Screen) and Android (Chrome PWA) with Web Push notification support.
 
+## 🛠️ Getting Started
+
+### 1. Install Dependencies
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Configure Environment Variables
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+Fill in:
+```env
+NEXT_PUBLIC_API_URL=https://fireline-backend-2jhp.onrender.com/api
+NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key
+```
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### 3. Run Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 4. Build for Production
+```bash
+npm run build
+npm start
+```
