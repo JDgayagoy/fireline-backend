@@ -200,7 +200,7 @@ export default function App() {
     <div className="min-h-screen bg-[#f6f7f9] text-zinc-950 flex flex-col md:flex-row pb-24 md:pb-0 font-sans antialiased selection:bg-[#c8ff00] selection:text-black">
       {/* Browser Offline Banner */}
       {isBrowserOffline && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-zinc-950 font-bold text-xs py-2 px-4 text-center shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-zinc-950 font-bold text-xs pt-[max(calc(env(safe-area-inset-top,0px)+6px),16px)] pb-2 px-4 text-center shadow-md">
           You are offline. Showing cached sensor data. Controls are temporarily disabled.
         </div>
       )}
@@ -282,7 +282,7 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Sticky Mobile/Desktop Header */}
-        <header className="sticky top-0 z-40 bg-[#f6f7f9]/90 backdrop-blur-md px-5 md:px-8 py-4 flex items-center justify-between border-b border-zinc-200/50 md:border-b-0">
+        <header className="sticky top-0 z-40 bg-[#f6f7f9]/95 backdrop-blur-md px-5 md:px-8 pt-[max(calc(env(safe-area-inset-top,0px)+12px),24px)] pb-3 md:py-4 flex items-center justify-between border-b border-zinc-200/50 md:border-b-0">
           {/* Mobile FireLine Brand Header */}
           <div className="flex items-center gap-2.5 md:hidden">
             <div className="w-9 h-9 rounded-xl bg-zinc-950 text-[#c8ff00] flex items-center justify-center shadow-sm shrink-0">
