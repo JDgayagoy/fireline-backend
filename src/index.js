@@ -14,6 +14,21 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Root & Health Checks for Render
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'FireLine Gas & Fire Monitor API',
+    version: '1.0.0',
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Start safety watchdogs
 startWatchdogs();
 
@@ -58,7 +73,7 @@ app.get('/api/status', (req, res) => {
 // ----------------------------------------------------------------------------
 app.post('/api/readings', async (req, res) => {
   try {
-    const { gas, smoke, temperature, rssi, uptime, firmware_version } = req.body;
+    const { gas, smoke, temperature, humidity, rssi, uptime, firmware_version } = req.body;
 
     if (gas === undefined || temperature === undefined) {
       return res.status(400).json({ error: 'Missing required reading fields: gas and temperature' });
@@ -108,6 +123,7 @@ app.post('/api/readings', async (req, res) => {
       gas_ppm: Number(gas),
       smoke_level: Number(smoke || 0),
       temperature: Number(temperature),
+      humidity: humidity !== undefined ? Number(humidity) : 55,
       rssi: Number(rssi || memoryStore.deviceStatus.rssi),
       uptime: Number(uptime || memoryStore.deviceStatus.uptime),
       firmware_version: firmware_version || memoryStore.deviceStatus.firmware_version
@@ -121,14 +137,19 @@ app.post('/api/readings', async (req, res) => {
     // Threshold Safety Checks
     const isGasDanger = readingRecord.gas_ppm >= config.gas_danger_threshold;
     const isTempDanger = readingRecord.temperature >= config.temp_danger_threshold;
+    const isSmokeDanger = readingRecord.smoke_level >= (config.smoke_danger_threshold || 250);
     const isGasWatch = readingRecord.gas_ppm >= config.gas_watch_threshold;
     const isTempWatch = readingRecord.temperature >= config.temp_watch_threshold;
+    const isSmokeWatch = readingRecord.smoke_level >= (config.smoke_watch_threshold || 100);
 
-    if (isGasDanger || isTempDanger) {
+    if (isGasDanger || isTempDanger || isSmokeDanger) {
       // Danger Alert Trigger
+      const sensorType = isGasDanger ? 'gas' : (isSmokeDanger ? 'smoke' : 'temperature');
       const reason = isGasDanger 
-        ? `LPG Gas level reached ${readingRecord.gas_ppm} PPM (Danger threshold: ${config.gas_danger_threshold} PPM)`
-        : `High temperature reached ${readingRecord.temperature}°C (Danger threshold: ${config.temp_danger_threshold}°C)`;
+        ? `MQ-2 LPG Gas level reached ${readingRecord.gas_ppm} PPM (Danger threshold: ${config.gas_danger_threshold} PPM)`
+        : (isSmokeDanger 
+            ? `MQ-2 Smoke level reached ${readingRecord.smoke_level} PPM (Danger threshold: ${config.smoke_danger_threshold || 250} PPM)`
+            : `DHT11 High temperature reached ${readingRecord.temperature}°C (Danger threshold: ${config.temp_danger_threshold}°C)`);
 
       console.warn(`🚨 DANGER TRIGGERED: ${reason}`);
 
@@ -136,7 +157,7 @@ app.post('/api/readings', async (req, res) => {
       const existingActive = memoryStore.alerts.find(a => 
         a.status === 'active' && 
         a.level === 'danger' && 
-        a.sensor_type === (isGasDanger ? 'gas' : 'temperature')
+        a.sensor_type === sensorType
       );
 
       if (!existingActive) {
@@ -169,20 +190,8 @@ app.post('/api/readings', async (req, res) => {
         };
         memoryStore.events.unshift(dangerEvent);
 
-        // Auto-close valve safety command if not already closed
-        if (memoryStore.deviceStatus.valveState !== 'closed') {
-          const autoCloseCmd = {
-            id: `cmd-${Date.now()}`,
-            device_id: config.device_id,
-            command: 'close_valve',
-            status: 'pending',
-            requested_by: 'system_auto_shutoff',
-            requested_at: now.toISOString(),
-            payload: { trigger: reason }
-          };
-          memoryStore.commands.unshift(autoCloseCmd);
-          console.warn('🔒 Auto-shutoff command queued: close_valve');
-        }
+        // Threshold breached: Dispatches push notification alert without turning off hardware components
+        console.log(`📢 [THRESHOLD PUSH ALERT] Limit breached (${reason}). Dispatching push notification to user.`);
 
         if (supabase) {
           await supabase.from('alerts').insert([dangerAlert]);

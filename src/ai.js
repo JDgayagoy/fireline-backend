@@ -98,8 +98,8 @@ export function handleAIChatQuery(prompt) {
 
   if (query.includes('valve') || query.includes('shut off') || query.includes('closed')) {
     return `The emergency solenoid valve is currently **${status.valveState.toUpperCase()}**.
-- Remote shutoff can be executed at any time from the dashboard with safety confirmation.
-- The ESP32 is programmed with autonomous fail-safe: if gas exceeds ${config.gas_danger_threshold} PPM or temp exceeds ${config.temp_danger_threshold}°C, it shuts the valve instantly even if offline.`;
+- Remote valve shutoff can be executed manually from the dashboard with safety confirmation.
+- Threshold limits in settings send urgent push notification alerts to the user rather than automatically turning off hardware.`;
   }
 
   if (query.includes('alert') || query.includes('spike') || query.includes('danger') || query.includes('happen')) {

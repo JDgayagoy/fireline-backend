@@ -88,6 +88,7 @@ function generateReading() {
   let gas = config.clean_air_baseline + jitter;
   let smoke = 45 + jitter;
   let temp = 26.5 + (Math.random() - 0.5);
+  let humidity = 56 + (Math.random() - 0.5) * 4;
 
   if (mode === 'leak') {
     // Accelerate gas concentration
@@ -98,20 +99,19 @@ function generateReading() {
     gas = 280 + jitter;
     smoke = 320 + (Math.random() * 30);
     temp = 68.5 + (Math.random() * 3);
+    humidity = 35 + (Math.random() * 5); // Low humidity in intense fire
   }
 
-  // Edge autonomous safety rule: shut valve locally if danger threshold breached
-  if ((gas >= config.gas_danger_threshold || temp >= config.temp_danger_threshold) && valveState === 'open') {
-    console.log('\n🚨 [AUTONOMOUS EDGE FAIL-SAFE ACTIVATED] Sensor breached danger threshold!');
-    console.log(`   Gas: ${gas.toFixed(1)} PPM (Limit: ${config.gas_danger_threshold}), Temp: ${temp.toFixed(1)}°C`);
-    console.log('   -> Relay CW-025 IMMEDIATELY TRIPPED. Valve CLOSED locally on device.');
-    valveState = 'closed';
+  // Sensor limit breach: triggers push notification without turning off hardware valve
+  if ((gas >= config.gas_danger_threshold || temp >= config.temp_danger_threshold)) {
+    console.log(`📢 [THRESHOLD BREACH] Gas: ${gas.toFixed(1)} PPM, Temp: ${temp.toFixed(1)}°C -> Push notification triggered (hardware valve untouched)`);
   }
 
   return {
     gas: Number(gas.toFixed(1)),
     smoke: Number(smoke.toFixed(1)),
     temperature: Number(temp.toFixed(1)),
+    humidity: Number(humidity.toFixed(1)),
     rssi: -62 + Math.floor((Math.random() - 0.5) * 6),
     uptime: uptimeSeconds,
     firmware_version: 'v1.0.0-esp32'
@@ -135,7 +135,7 @@ async function sendReadings() {
     });
 
     if (res.ok) {
-      process.stdout.write(`\r📊 [${new Date().toLocaleTimeString()}] Gas: ${payload.gas} PPM | Smoke: ${payload.smoke} | Temp: ${payload.temperature}°C | Valve: ${valveState.toUpperCase()} | RSSI: ${payload.rssi} dBm `);
+      process.stdout.write(`\r📊 [${new Date().toLocaleTimeString()}] MQ-2 Gas: ${payload.gas} PPM | Smoke: ${payload.smoke} | DHT11 Temp: ${payload.temperature}°C | Humidity: ${payload.humidity}% | Valve: ${valveState.toUpperCase()} `);
     } else {
       console.error(`\n❌ Failed to post readings: HTTP ${res.status}`);
     }
