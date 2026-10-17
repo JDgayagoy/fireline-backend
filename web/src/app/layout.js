@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Gas & Fire Monitor PWA',
-  description: 'Real-time IoT Gas, Smoke, and Fire Monitoring System with Solenoid Valve Control',
+  title: 'FireLine Gas & Fire Safety PWA',
+  description: 'FireLine Real-time Autonomous IoT Gas & Fire Safety Hub with Solenoid Valve Control',
   manifest: '/manifest.json'
 };
 

@@ -1,10 +1,10 @@
 {
-  "name": "Gas & Fire Monitor PWA",
-  "short_name": "GasMonitor",
-  "description": "IoT Gas, Smoke, and Fire Monitoring System with Remote Solenoid Control",
+  "name": "FireLine Gas & Fire Safety PWA",
+  "short_name": "FireLine",
+  "description": "FireLine Autonomous IoT Gas, Smoke, and Fire Monitoring System",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#09090b",
+  "background_color": "#f6f7f9",
   "theme_color": "#09090b",
   "icons": [
     {
