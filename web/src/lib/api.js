@@ -101,3 +101,6 @@ export async function addContact(contact) {
   if (!res.ok) throw new Error('Failed to add contact');
   return res.json();
 }
+
+export { loginUser, registerUser, logoutUser, getCurrentSession, AUTHORIZED_USERS, getAllKnownAccounts } from './auth';
+

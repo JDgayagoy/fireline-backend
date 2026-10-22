@@ -12,7 +12,10 @@ import {
   Phone, 
   CheckCircle2, 
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  LogOut,
+  UserCheck,
+  KeyRound
 } from 'lucide-react';
 
 export default function SettingsView({
@@ -20,8 +23,12 @@ export default function SettingsView({
   onUpdateConfig,
   contacts = [],
   onAddContact,
-  isAdmin,
+  isAdmin = true,
   setIsAdmin,
+  currentUser,
+  isSuperAdmin = false,
+  onLogout,
+  onSwitchAccount,
   onQueueCommand
 }) {
   const [form, setForm] = useState({
@@ -86,43 +93,61 @@ export default function SettingsView({
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-zinc-950">System Configuration & Safety Rules</h2>
-          <p className="text-xs text-zinc-400">Tune sensor alert limits, offline watchdogs, and push notification triggers</p>
+      {/* Authenticated Officer Session Card */}
+      <div className="rounded-[28px] border border-zinc-200/90 bg-white p-5 md:p-6 shadow-smart-card flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-zinc-950 text-[#c8ff00] flex items-center justify-center font-black shadow-sm shrink-0">
+            <UserCheck className="w-6 h-6 text-[#c8ff00]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-black text-zinc-950">
+                {currentUser?.name || (isSuperAdmin ? 'Super Admin' : 'Safety Admin')}
+              </h2>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                isSuperAdmin 
+                  ? 'bg-zinc-950 text-[#c8ff00] border border-zinc-800' 
+                  : 'bg-zinc-100 text-zinc-800'
+              }`}>
+                {currentUser?.role || (isSuperAdmin ? 'superadmin' : 'admin')}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 font-mono mt-0.5">
+              {currentUser?.email || (isSuperAdmin ? 'superadmin@test.com' : 'admin@test.com')}
+            </p>
+          </div>
         </div>
 
-        {/* Demo Role Switcher */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-zinc-200/80 shadow-sm self-start sm:self-auto">
-          <span className="text-xs text-zinc-400 font-semibold pl-2">Role:</span>
-          <button
-            type="button"
-            onClick={() => setIsAdmin(true)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              isAdmin ? 'bg-zinc-950 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
-            }`}
-          >
-            Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsAdmin(false)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              !isAdmin ? 'bg-zinc-950 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900'
-            }`}
-          >
-            Viewer
-          </button>
+        {/* Account Switcher and Logout */}
+        <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-end">
+          {onSwitchAccount && (
+            <button
+              type="button"
+              onClick={() => {
+                const target = currentUser?.email === 'superadmin@test.com' ? 'admin@test.com' : 'superadmin@test.com';
+                onSwitchAccount(target);
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-800 transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Fast switch between authorized test accounts"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-zinc-600" />
+              <span>Switch to {currentUser?.email === 'superadmin@test.com' ? 'admin@test.com' : 'superadmin@test.com'}</span>
+            </button>
+          )}
+
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {!isAdmin && (
-        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>You are viewing Settings as a <strong>Viewer</strong>. Settings are locked to read-only. Switch role above to edit.</span>
-        </div>
-      )}
 
       {/* 1. MQ-2 Sensor Thresholds (Gas Leak & Smoke Detector) */}
       <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 space-y-6 shadow-smart-card">
@@ -166,7 +191,7 @@ export default function SettingsView({
               onChange={(e) => setForm({ ...form, gas_danger_threshold: Number(e.target.value) })}
               className="w-full accent-red-600 cursor-pointer disabled:opacity-50"
             />
-            <p className="text-[11px] text-zinc-400">Breaching this limit sends an urgent push notification to the user without turning off hardware.</p>
+            <p className="text-[11px] text-zinc-400">Critical danger limit; triggers automatic solenoid valve shutoff, audio chime, and SIM800L SMS alert.</p>
           </div>
 
           {/* Gas Watch Slider */}
@@ -257,7 +282,7 @@ export default function SettingsView({
               onChange={(e) => setForm({ ...form, temp_danger_threshold: Number(e.target.value) })}
               className="w-full accent-red-600 cursor-pointer disabled:opacity-50"
             />
-            <p className="text-[11px] text-zinc-400">High thermal alert threshold; sends an immediate push notification to the user.</p>
+            <p className="text-[11px] text-zinc-400">High thermal alert threshold; triggers emergency solenoid valve shutoff and SIM800L SMS alert.</p>
           </div>
 
           {/* Temperature Watch Slider */}

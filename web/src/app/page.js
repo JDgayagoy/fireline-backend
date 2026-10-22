@@ -14,10 +14,13 @@ import {
   Settings,
   ShieldCheck,
   TrendingUp,
-  ListTodo
+  ListTodo,
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 import ConnectionBadge from '../components/connection-badge';
 import PwaInstaller from '../components/pwa-installer';
+import LoginView from '../components/auth/login-view';
 import DashboardView from '../components/screens/dashboard-view';
 import HistoryView from '../components/screens/history-view';
 import EventsView from '../components/screens/events-view';
@@ -36,10 +39,45 @@ import {
   fetchContacts, 
   addContact 
 } from '../lib/api';
+import { getCurrentSession, logoutUser, AUTHORIZED_USERS, getAllKnownAccounts, loginUser } from '../lib/auth';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isAdmin, setIsAdmin] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Restore session from localStorage on initial mount
+  useEffect(() => {
+    const sessionUser = getCurrentSession();
+    if (sessionUser) {
+      setCurrentUser(sessionUser);
+    }
+    setAuthLoading(false);
+  }, []);
+
+  const handleLogout = () => {
+    logoutUser();
+    setCurrentUser(null);
+  };
+
+  const handleSwitchAccount = async (targetEmail) => {
+    const all = getAllKnownAccounts();
+    const target = all.find(u => u.email.toLowerCase() === targetEmail.toLowerCase()) 
+      || AUTHORIZED_USERS.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
+    if (target && target.password) {
+      try {
+        const user = await loginUser(target.email, target.password);
+        setCurrentUser(user);
+      } catch (e) {
+        handleLogout();
+      }
+    } else {
+      handleLogout();
+    }
+  };
+
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
+  const isSuperAdmin = currentUser?.role === 'superadmin';
 
   // System State
   const [status, setStatus] = useState({
@@ -136,20 +174,20 @@ export default function App() {
     }
   }, [alerts]);
 
-  // Actions
+  // Actions with user audit attribution
   const handleShutoffGas = async () => {
-    await queueCommand('close_valve', isAdmin ? 'admin' : 'viewer');
+    await queueCommand('close_valve', currentUser?.email || 'admin');
     await syncData();
   };
 
   const handleReopenGas = async () => {
-    await queueCommand('open_valve', isAdmin ? 'admin' : 'viewer');
+    await queueCommand('open_valve', currentUser?.email || 'admin');
     await syncData();
   };
 
   const handleAcknowledgeAlert = async (alertId) => {
     import('@/lib/notifications').then(n => n.stopEmergencyAlarmChime()).catch(() => {});
-    await acknowledgeAlert(alertId, isAdmin ? 'admin' : 'viewer');
+    await acknowledgeAlert(alertId, currentUser?.email || 'admin');
     await syncData();
   };
 
@@ -195,6 +233,25 @@ export default function App() {
       })
     );
   }, []);
+
+  // Auth Verification Splash Screen
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-white selection:bg-[#c8ff00] selection:text-black">
+        <div className="w-14 h-14 rounded-2xl bg-[#c8ff00] text-zinc-950 flex items-center justify-center font-black shadow-[0_0_35px_rgba(200,255,0,0.4)] animate-pulse mb-4">
+          <Flame className="w-8 h-8 fill-zinc-950 text-zinc-950" />
+        </div>
+        <p className="text-xs text-zinc-400 font-mono tracking-widest uppercase">
+          FireLine Security Gate...
+        </p>
+      </div>
+    );
+  }
+
+  // Not Authenticated -> Show Login View
+  if (!currentUser) {
+    return <LoginView onLoginSuccess={(user) => setCurrentUser(user)} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f7f9] text-zinc-950 flex flex-col md:flex-row pb-24 md:pb-0 font-sans antialiased selection:bg-[#c8ff00] selection:text-black">
@@ -258,7 +315,7 @@ export default function App() {
         </div>
 
         {/* Sidebar Footer Info */}
-        <div className="pt-6 border-t border-zinc-100 space-y-3.5 text-xs">
+        <div className="pt-5 border-t border-zinc-100 space-y-4 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-zinc-400 font-medium">IoT Node Link</span>
             <ConnectionBadge 
@@ -268,13 +325,42 @@ export default function App() {
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-zinc-400 font-medium">Access Tier</span>
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-              isAdmin ? 'bg-zinc-950 text-[#c8ff00]' : 'bg-zinc-100 text-zinc-700'
-            }`}>
-              {isAdmin ? 'Admin' : 'Viewer'}
-            </span>
+          {/* Authenticated Officer Profile */}
+          <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                Operator Account
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                isSuperAdmin 
+                  ? 'bg-zinc-950 text-[#c8ff00]' 
+                  : 'bg-zinc-900 text-white'
+              }`}>
+                {currentUser?.role}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-zinc-900 text-[#c8ff00] flex items-center justify-center font-bold text-xs shrink-0">
+                <UserCheck className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-zinc-900 truncate">
+                  {currentUser?.name}
+                </p>
+                <p className="text-[10px] text-zinc-400 font-mono truncate">
+                  {currentUser?.email}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full mt-1 py-1.5 px-3 rounded-xl bg-white hover:bg-red-50 text-zinc-600 hover:text-red-600 border border-zinc-200/90 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </div>
       </aside>
@@ -331,6 +417,16 @@ export default function App() {
                 </span>
               )}
             </button>
+
+            {/* Mobile Sign Out Button */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="md:hidden w-10 h-10 rounded-full bg-white border border-zinc-200/80 text-zinc-700 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-all shadow-sm shrink-0"
+              title={`Signed in as ${currentUser?.email}. Tap to Sign Out.`}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </header>
 
@@ -378,7 +474,10 @@ export default function App() {
               contacts={contacts}
               onAddContact={handleAddContact}
               isAdmin={isAdmin}
-              setIsAdmin={setIsAdmin}
+              isSuperAdmin={isSuperAdmin}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+              onSwitchAccount={handleSwitchAccount}
               onQueueCommand={handleQueueCommand}
             />
           )}

@@ -88,8 +88,10 @@ export default function DeviceHealthCard({ status = {}, defaultOpen = true }) {
           <div className="p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200/60">
             <span className="text-zinc-400 block mb-1 font-medium text-[11px]">GSM SIM800L</span>
             <div className="flex items-center gap-1.5 font-mono text-zinc-900 font-bold">
-              <Radio className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="text-emerald-700 font-semibold">SMS Ready</span>
+              <Radio className={`w-3.5 h-3.5 shrink-0 ${status.sms_last_status === 'failed' ? 'text-red-500' : 'text-emerald-600'}`} />
+              <span className={status.sms_last_status === 'failed' ? 'text-red-600 font-semibold' : (status.sms_last_status === 'sent' ? 'text-emerald-700 font-semibold' : 'text-emerald-700 font-semibold')}>
+                {status.sms_last_status === 'sent' ? 'SMS Sent' : (status.sms_last_status === 'failed' ? 'SMS Failed' : 'SMS Ready')}
+              </span>
             </div>
           </div>
 
