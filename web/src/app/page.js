@@ -486,6 +486,8 @@ export default function App() {
             <HistoryView
               readings={readings}
               config={config}
+              alerts={alerts}
+              events={events}
             />
           )}
 
