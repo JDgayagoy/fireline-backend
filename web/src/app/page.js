@@ -498,7 +498,14 @@ export default function App() {
           )}
 
           {activeTab === 'assistant' && (
-            <AssistantView />
+            <AssistantView
+              status={status}
+              readings={readings}
+              config={config}
+              alerts={alerts}
+              events={events}
+              contacts={contacts}
+            />
           )}
 
           {activeTab === 'settings' && (

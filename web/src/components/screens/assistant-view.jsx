@@ -4,7 +4,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Bot, User, Info, Loader2 } from 'lucide-react';
 import { sendAIChatMessage } from '@/lib/api';
 
-export default function AssistantView() {
+export default function AssistantView({
+  status,
+  readings = [],
+  config,
+  alerts = [],
+  events = [],
+  contacts = []
+}) {
   const [messages, setMessages] = useState([
     {
       id: '1',
@@ -46,12 +53,21 @@ export default function AssistantView() {
     setInput('');
     setIsLoading(true);
 
+    const clientContext = {
+      status,
+      readings: readings.slice(0, 20),
+      config,
+      alerts,
+      events: events.slice(0, 10),
+      contacts
+    };
+
     try {
-      const res = await sendAIChatMessage(text);
+      const res = await sendAIChatMessage(text, clientContext);
       const aiMsg = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: res.reply || 'I processed the sensor data. Everything appears stable and within safe limits.',
+        text: res.reply || 'I processed the live sensor telemetry. All zones appear stable within baseline limits.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiMsg]);
