@@ -37,7 +37,9 @@ import {
   fetchEvents, 
   queueCommand, 
   fetchContacts, 
-  addContact 
+  addContact,
+  updateContact,
+  deleteContact
 } from '../lib/api';
 import { getCurrentSession, logoutUser, AUTHORIZED_USERS, getAllKnownAccounts, loginUser } from '../lib/auth';
 
@@ -215,6 +217,26 @@ export default function App() {
 
   const handleAddContact = async (newContact) => {
     await addContact(newContact);
+    await syncData();
+  };
+
+  const handleUpdateContact = async (contactId, updates) => {
+    setContacts(prev => prev.map(c => String(c.id) === String(contactId) ? { ...c, ...updates } : c));
+    try {
+      await updateContact(contactId, updates);
+    } catch (e) {
+      console.warn('Update contact note:', e.message);
+    }
+    await syncData();
+  };
+
+  const handleDeleteContact = async (contactId) => {
+    setContacts(prev => prev.filter(c => String(c.id) !== String(contactId)));
+    try {
+      await deleteContact(contactId);
+    } catch (e) {
+      console.warn('Delete contact note:', e.message);
+    }
     await syncData();
   };
 
@@ -485,6 +507,8 @@ export default function App() {
               onUpdateConfig={handleUpdateConfig}
               contacts={contacts}
               onAddContact={handleAddContact}
+              onUpdateContact={handleUpdateContact}
+              onDeleteContact={handleDeleteContact}
               isAdmin={isAdmin}
               isSuperAdmin={isSuperAdmin}
               currentUser={currentUser}

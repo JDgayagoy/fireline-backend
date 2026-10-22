@@ -19,7 +19,11 @@ import {
   KeyRound,
   Volume2,
   VolumeX,
-  Sparkles
+  Sparkles,
+  Trash2,
+  Star,
+  ShieldAlert,
+  Check
 } from 'lucide-react';
 import { 
   getNotificationPermission, 
@@ -34,6 +38,8 @@ export default function SettingsView({
   onUpdateConfig,
   contacts = [],
   onAddContact,
+  onUpdateContact,
+  onDeleteContact,
   isAdmin = true,
   setIsAdmin,
   currentUser,
@@ -63,7 +69,8 @@ export default function SettingsView({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
-  const [newContact, setNewContact] = useState({ name: '', phone_number: '', relationship: 'Escalation Contact' });
+  const [newContact, setNewContact] = useState({ name: '', phone_number: '', relationship: '', priority: 1 });
+  const [deletingContactId, setDeletingContactId] = useState(null);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [notificationPerm, setNotificationPerm] = useState('default');
   const [isEnablingPush, setIsEnablingPush] = useState(false);
@@ -102,10 +109,31 @@ export default function SettingsView({
     if (!newContact.name || !newContact.phone_number) return;
     await onAddContact({
       ...newContact,
-      priority: contacts.length + 1
+      priority: Number(newContact.priority) || 1
     });
-    setNewContact({ name: '', phone_number: '', relationship: 'Escalation Contact' });
+    setNewContact({ name: '', phone_number: '', relationship: '', priority: 1 });
     setIsContactModalOpen(false);
+  };
+
+  const handleTogglePriority = async (contact) => {
+    if (!isAdmin || !onUpdateContact) return;
+    const newPriority = Number(contact.priority) === 1 ? 2 : 1;
+    await onUpdateContact(contact.id, {
+      priority: newPriority,
+      relationship: newPriority === 1 ? 'Primary Safety Contact' : 'Secondary Escalation Contact'
+    });
+  };
+
+  const handleDeleteContact = async (contactId) => {
+    if (!isAdmin || !onDeleteContact) return;
+    if (window.confirm('Are you sure you want to remove this emergency contact?')) {
+      setDeletingContactId(contactId);
+      try {
+        await onDeleteContact(contactId);
+      } finally {
+        setDeletingContactId(null);
+      }
+    }
   };
 
   const handleEnablePopupNotifications = async () => {
@@ -474,20 +502,25 @@ export default function SettingsView({
       </div>
 
 
-      {/* 4. Emergency Contacts & Escalation Order */}
+      {/* 4. Emergency Contacts & Multi-Tier Escalation Order */}
       <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 space-y-4 shadow-smart-card">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-800">
               <Users className="w-4 h-4" />
             </div>
-            <h3 className="text-base font-bold text-zinc-900">Emergency Contacts & Escalation</h3>
+            <div>
+              <h3 className="text-base font-bold text-zinc-900">Emergency Contacts & Multi-Tier Escalation</h3>
+              <p className="text-xs text-zinc-400">
+                Primary contacts receive instant SMS upon danger detection. Secondary contacts receive SMS if alarm is unacknowledged.
+              </p>
+            </div>
           </div>
           {isAdmin && (
             <button
               type="button"
               onClick={() => setIsContactModalOpen(true)}
-              className="px-4 py-1.5 rounded-full text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              className="px-4 py-1.5 rounded-full text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm self-start sm:self-auto"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Contact</span>
@@ -495,32 +528,94 @@ export default function SettingsView({
           )}
         </div>
 
-        <div className="space-y-2.5">
-          {contacts.map((contact, idx) => (
-            <div
-              key={contact.id}
-              className="flex items-center justify-between p-3.5 rounded-2xl border border-zinc-200/70 bg-zinc-50"
-            >
-              <div className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-zinc-200 text-zinc-800 font-mono text-xs flex items-center justify-center font-bold">
-                  {idx + 1}
-                </span>
-                <div>
-                  <h4 className="text-sm font-bold text-zinc-900">{contact.name}</h4>
-                  <p className="text-xs text-zinc-500 font-medium">{contact.relationship} &bull; <span className="font-mono text-zinc-700">{contact.phone_number}</span></p>
-                </div>
-              </div>
+        {contacts.length === 0 ? (
+          <div className="p-8 text-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50">
+            <Users className="w-8 h-8 mx-auto text-zinc-300 mb-2" />
+            <p className="text-xs font-bold text-zinc-600">No emergency contacts configured</p>
+            <p className="text-[11px] text-zinc-400 mt-0.5">Add primary and secondary contacts to receive GSM hardware SMS alerts.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {contacts.map((contact, idx) => {
+              const isPrimary = Number(contact.priority) === 1;
+              return (
+                <div
+                  key={contact.id || idx}
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border transition-all gap-3 ${
+                    isPrimary 
+                      ? 'border-emerald-200/90 bg-emerald-50/30 shadow-sm' 
+                      : 'border-zinc-200/70 bg-zinc-50/70'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 mt-0.5 ${
+                      isPrimary 
+                        ? 'bg-emerald-500 text-white shadow-sm' 
+                        : 'bg-zinc-200 text-zinc-700'
+                    }`}>
+                      {isPrimary ? <Star className="w-4 h-4 fill-white" /> : (idx + 1)}
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-black text-zinc-900">{contact.name}</h4>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          isPrimary
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-blue-100 text-blue-800 border border-blue-200'
+                        }`}>
+                          {isPrimary ? '★ Primary (Instant SMS)' : '⏱ Secondary (Escalation Backup)'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-500 font-medium mt-0.5">
+                        {contact.relationship} &bull;{' '}
+                        <span className="font-mono text-zinc-800 font-semibold">{contact.phone_number}</span>
+                      </p>
+                    </div>
+                  </div>
 
-              <a
-                href={`tel:${contact.phone_number}`}
-                className="w-9 h-9 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-emerald-600 hover:bg-zinc-50 transition-colors shadow-sm"
-                title="Call Emergency Contact"
-              >
-                <Phone className="w-4 h-4" />
-              </a>
-            </div>
-          ))}
-        </div>
+                  {/* Actions for Contact */}
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePriority(contact)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
+                          isPrimary
+                            ? 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                        }`}
+                        title={isPrimary ? 'Demote to Secondary backup' : 'Promote to Primary immediate responder'}
+                      >
+                        <Star className={`w-3.5 h-3.5 ${isPrimary ? 'text-amber-500 fill-amber-500' : 'text-emerald-600'}`} />
+                        <span>{isPrimary ? 'Set Secondary' : 'Set Primary'}</span>
+                      </button>
+                    )}
+
+                    <a
+                      href={`tel:${contact.phone_number}`}
+                      className="w-8 h-8 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-emerald-600 hover:bg-zinc-50 transition-colors shadow-sm"
+                      title={`Call ${contact.name}`}
+                    >
+                      <Phone className="w-4 h-4" />
+                    </a>
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        disabled={deletingContactId === contact.id}
+                        onClick={() => handleDeleteContact(contact.id)}
+                        className="w-8 h-8 rounded-xl bg-white hover:bg-red-50 text-zinc-400 hover:text-red-600 border border-zinc-200 transition-colors flex items-center justify-center cursor-pointer shadow-sm disabled:opacity-50"
+                        title="Delete contact"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 5. Language & Localization */}
@@ -570,16 +665,61 @@ export default function SettingsView({
       {isContactModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md rounded-[28px] border border-zinc-200 bg-white p-6 shadow-2xl text-zinc-950 space-y-4">
-            <h3 className="text-base font-bold text-zinc-950">Add Emergency Escalation Contact</h3>
+            <div>
+              <h3 className="text-base font-black text-zinc-950">Add Emergency Contact</h3>
+              <p className="text-xs text-zinc-400">Configure phone number for hardware GSM SMS alerts</p>
+            </div>
 
             <div className="space-y-3">
+              {/* Alert Response Tier Selector */}
+              <div>
+                <label className="text-xs font-bold text-zinc-700 block mb-1.5">Alert Response Tier</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewContact({ ...newContact, priority: 1, relationship: newContact.relationship || 'Primary Safety Contact' })}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      Number(newContact.priority) === 1
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm ring-2 ring-emerald-500/20'
+                        : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-black text-xs">
+                      <Star className={`w-3.5 h-3.5 ${Number(newContact.priority) === 1 ? 'fill-emerald-600 text-emerald-600' : 'text-zinc-400'}`} />
+                      <span>Primary Contact</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mt-1 leading-tight">
+                      Alerted immediately when danger threshold trips.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewContact({ ...newContact, priority: 2, relationship: newContact.relationship || 'Secondary Escalation Contact' })}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      Number(newContact.priority) > 1
+                        ? 'border-blue-500 bg-blue-50 text-blue-950 shadow-sm ring-2 ring-blue-500/20'
+                        : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-black text-xs">
+                      <ShieldAlert className={`w-3.5 h-3.5 ${Number(newContact.priority) > 1 ? 'text-blue-600' : 'text-zinc-400'}`} />
+                      <span>Secondary Backup</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mt-1 leading-tight">
+                      Alerted if alarm is unacknowledged past timeout.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-zinc-700 block mb-1">Contact Name</label>
                 <input
                   type="text"
                   value={newContact.name}
                   onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-                  placeholder="e.g. Building Security Desk"
+                  placeholder="e.g. Officer Juan Dela Cruz"
                   className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#c8ff00]"
                 />
               </div>
@@ -593,15 +733,16 @@ export default function SettingsView({
                   placeholder="+63 9XX XXX XXXX"
                   className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#c8ff00]"
                 />
+                <p className="text-[10px] text-zinc-400 mt-1">Accepts +639XXXXXXXXX or 09XXXXXXXXX</p>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-700 block mb-1">Relationship</label>
+                <label className="text-xs font-bold text-zinc-700 block mb-1">Relationship / Organization</label>
                 <input
                   type="text"
                   value={newContact.relationship}
                   onChange={(e) => setNewContact({ ...newContact, relationship: e.target.value })}
-                  placeholder="e.g. Fire Safety Officer"
+                  placeholder="e.g. Building Fire Safety Officer / Guardhouse"
                   className="w-full h-10 px-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#c8ff00]"
                 />
               </div>
@@ -618,7 +759,8 @@ export default function SettingsView({
               <button
                 type="button"
                 onClick={handleSaveContact}
-                className="h-10 px-5 rounded-full text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white transition-colors shadow-sm"
+                disabled={!newContact.name || !newContact.phone_number}
+                className="h-10 px-5 rounded-full text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 Save Contact
               </button>

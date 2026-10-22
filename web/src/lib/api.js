@@ -86,20 +86,136 @@ export async function sendAIChatMessage(prompt) {
   return res.json();
 }
 
+import { supabase } from './supabase';
+
 export async function fetchContacts() {
-  const res = await fetch(`${API_BASE}/contacts`, { cache: 'no-store' });
-  if (!res.ok) throw new Error('Failed to fetch contacts');
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/contacts`, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('cached_contacts', JSON.stringify(data));
+      }
+      return data;
+    }
+  } catch (err) {
+    console.warn('Fetch contacts network blip:', err.message);
+  }
+
+  // Supabase fallback
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('contacts').select('*').order('priority', { ascending: true });
+      if (!error && data && data.length > 0) {
+        if (typeof window !== 'undefined') localStorage.setItem('cached_contacts', JSON.stringify(data));
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase fetch contacts fallback error:', e.message);
+    }
+  }
+
+  // LocalStorage cached fallback
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem('cached_contacts');
+    if (cached) return JSON.parse(cached);
+  }
+
+  return [];
 }
 
 export async function addContact(contact) {
-  const res = await fetch(`${API_BASE}/contacts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(contact)
-  });
-  if (!res.ok) throw new Error('Failed to add contact');
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(contact)
+    });
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('API add contact failed, trying Supabase fallback:', err.message);
+  }
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('contacts').insert([contact]).select();
+      if (!error && data && data.length > 0) return data[0];
+    } catch (e) {
+      console.warn('Supabase insert contact fallback error:', e.message);
+    }
+  }
+
+  return contact;
+}
+
+export async function updateContact(id, updates) {
+  try {
+    const res = await fetch(`${API_BASE}/contacts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('API update contact failed, trying Supabase fallback:', err.message);
+  }
+
+  // Supabase fallback
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('contacts').update(updates).eq('id', id).select();
+      if (!error && data && data.length > 0) return data[0];
+    } catch (e) {
+      console.warn('Supabase update contact fallback error:', e.message);
+    }
+  }
+
+  // Local fallback: update cached contacts in localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const local = JSON.parse(localStorage.getItem('cached_contacts') || '[]');
+      const idx = local.findIndex(c => String(c.id) === String(id));
+      if (idx !== -1) {
+        local[idx] = { ...local[idx], ...updates };
+        localStorage.setItem('cached_contacts', JSON.stringify(local));
+        return local[idx];
+      }
+    } catch (_) {}
+  }
+
+  return { id, ...updates };
+}
+
+export async function deleteContact(id) {
+  try {
+    const res = await fetch(`${API_BASE}/contacts/${id}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('API delete contact failed, trying Supabase fallback:', err.message);
+  }
+
+  // Supabase fallback
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('contacts').delete().eq('id', id);
+      if (!error) return { success: true, deletedId: id };
+    } catch (e) {
+      console.warn('Supabase delete contact fallback error:', e.message);
+    }
+  }
+
+  // Local fallback: remove from cached contacts in localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const local = JSON.parse(localStorage.getItem('cached_contacts') || '[]');
+      const updated = local.filter(c => String(c.id) !== String(id));
+      localStorage.setItem('cached_contacts', JSON.stringify(updated));
+    } catch (_) {}
+  }
+
+  return { success: true, deletedId: id };
 }
 
 export { loginUser, registerUser, logoutUser, getCurrentSession, AUTHORIZED_USERS, getAllKnownAccounts } from './auth';

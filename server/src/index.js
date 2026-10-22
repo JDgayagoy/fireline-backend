@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { memoryStore, supabase } from './db.js';
 import { startWatchdogs } from './watchdog.js';
 import { generateIncidentSummary, handleAIChatQuery } from './ai.js';
-import { addPushSubscription, dispatchWebPushAlert } from './notifications.js';
+import { addPushSubscription, dispatchWebPushAlert, dispatchSMSEscalation } from './notifications.js';
 
 dotenv.config();
 
@@ -427,6 +427,13 @@ app.post('/api/readings', async (req, res) => {
 
         // Dispatch Web Push Notification to active browsers
         dispatchWebPushAlert(dangerAlert).catch(err => console.error('Push error:', err));
+
+        // Immediately dispatch SMS to Primary Emergency Contacts (priority === 1)
+        const primaryContacts = (memoryStore.contacts || []).filter(c => c.is_active !== false && Number(c.priority) === 1 && c.phone_number);
+        console.log(`📡 [PRIMARY DISPATCH] Danger detected. Iterating over ${primaryContacts.length} primary contact(s)...`);
+        for (const contact of primaryContacts) {
+          dispatchSMSEscalation(contact, dangerAlert).catch(err => console.error('Primary SMS dispatch error:', err));
+        }
       }
     } else if (isGasWatch || isTempWatch) {
       // Watch Alert Trigger
@@ -729,25 +736,118 @@ app.get('/api/events', (req, res) => {
 // ----------------------------------------------------------------------------
 // Emergency Contacts
 // ----------------------------------------------------------------------------
-app.get('/api/contacts', (req, res) => {
-  res.json(memoryStore.contacts);
+app.get('/api/contacts', async (req, res) => {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('contacts').select('*').order('priority', { ascending: true });
+      if (!error && data && data.length > 0) {
+        memoryStore.contacts = data;
+      }
+    } catch (e) {
+      console.warn('Supabase contacts fetch fallback:', e.message);
+    }
+  }
+  // Sort contacts by priority ascending (1 = Primary, 2+ = Secondary)
+  const sorted = [...(memoryStore.contacts || [])].sort((a, b) => (Number(a.priority) || 99) - (Number(b.priority) || 99));
+  res.json(sorted);
 });
 
-app.post('/api/contacts', (req, res) => {
-  const { name, phone_number, relationship, priority = 1 } = req.body;
+app.post('/api/contacts', async (req, res) => {
+  const { name, phone_number, relationship, priority = 1, is_active = true } = req.body;
   if (!name || !phone_number) {
     return res.status(400).json({ error: 'Name and phone number are required' });
   }
+
+  let cleanPhone = String(phone_number).trim();
+  if (cleanPhone.startsWith('09')) {
+    cleanPhone = '+63' + cleanPhone.substring(1);
+  }
+
+  const contactPriority = Number(priority) || (memoryStore.contacts.length === 0 ? 1 : 2);
+  const defaultRel = contactPriority === 1 ? 'Primary Safety Contact' : 'Secondary Escalation Contact';
+
   const contact = {
     id: `contact-${Date.now()}`,
-    name,
-    phone_number,
-    relationship: relationship || 'Emergency Contact',
-    priority: Number(priority),
-    is_active: true
+    name: String(name).trim(),
+    phone_number: cleanPhone,
+    relationship: relationship?.trim() || defaultRel,
+    priority: contactPriority,
+    is_active: is_active !== false
   };
+
+  memoryStore.contacts = memoryStore.contacts || [];
   memoryStore.contacts.push(contact);
+
+  if (supabase) {
+    try {
+      await supabase.from('contacts').insert([contact]);
+    } catch (e) {
+      console.warn('Supabase contact insert note:', e.message);
+    }
+  }
+
   res.status(201).json(contact);
+});
+
+app.patch('/api/contacts/:id', async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  memoryStore.contacts = memoryStore.contacts || [];
+  const idx = memoryStore.contacts.findIndex(c => String(c.id) === String(id));
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Contact not found' });
+  }
+
+  if (updates.phone_number) {
+    let cleanPhone = String(updates.phone_number).trim();
+    if (cleanPhone.startsWith('09')) {
+      cleanPhone = '+63' + cleanPhone.substring(1);
+    }
+    updates.phone_number = cleanPhone;
+  }
+
+  if (updates.priority !== undefined) {
+    updates.priority = Number(updates.priority);
+  }
+
+  memoryStore.contacts[idx] = {
+    ...memoryStore.contacts[idx],
+    ...updates
+  };
+
+  if (supabase) {
+    try {
+      await supabase.from('contacts').update(updates).eq('id', id);
+    } catch (e) {
+      console.warn('Supabase contact update note:', e.message);
+    }
+  }
+
+  res.json(memoryStore.contacts[idx]);
+});
+
+app.delete('/api/contacts/:id', async (req, res) => {
+  const { id } = req.params;
+
+  memoryStore.contacts = memoryStore.contacts || [];
+  const initialLength = memoryStore.contacts.length;
+  memoryStore.contacts = memoryStore.contacts.filter(c => String(c.id) !== String(id));
+
+  if (supabase) {
+    try {
+      await supabase.from('contacts').delete().eq('id', id);
+    } catch (e) {
+      console.warn('Supabase contact delete note:', e.message);
+    }
+  }
+
+  if (memoryStore.contacts.length === initialLength) {
+    return res.status(404).json({ error: 'Contact not found' });
+  }
+
+  console.log(`🗑️ Emergency contact deleted: ${id}`);
+  res.json({ success: true, deletedId: id });
 });
 
 // ----------------------------------------------------------------------------

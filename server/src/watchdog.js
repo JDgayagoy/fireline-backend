@@ -77,10 +77,15 @@ export function startWatchdogs() {
             };
             memoryStore.events.unshift(escalationEvent);
 
-            // Dispatch SMS to secondary escalation contact (priority > 1)
-            const escalationContact = memoryStore.contacts.find(c => c.priority > 1 && c.is_active) || memoryStore.contacts[1];
-            if (escalationContact) {
-              await dispatchSMSEscalation(escalationContact, alert);
+            // Iterate over emergency escalation contacts (secondary contacts priority > 1, or all active)
+            const secondaryContacts = (memoryStore.contacts || []).filter(c => c.is_active !== false && c.priority > 1 && c.phone_number);
+            const targets = secondaryContacts.length > 0 
+              ? secondaryContacts 
+              : (memoryStore.contacts || []).filter(c => c.is_active !== false && c.phone_number);
+
+            console.log(`📡 [ESCALATION] Alert unacknowledged. Iterating over ${targets.length} emergency escalation contact(s)...`);
+            for (const contact of targets) {
+              await dispatchSMSEscalation(contact, alert);
             }
 
             if (supabase) {
