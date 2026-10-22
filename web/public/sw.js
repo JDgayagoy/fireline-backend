@@ -102,3 +102,18 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_POPUP') {
+    const { title, options } = event.data;
+    event.waitUntil(
+      self.registration.showNotification(title || '🚨 FireLine Safety Alert', {
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        vibrate: [400, 150, 400],
+        requireInteraction: true,
+        ...options
+      })
+    );
+  }
+});

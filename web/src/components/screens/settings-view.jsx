@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sliders, 
   Users, 
   Bell, 
+  BellRing,
   ShieldCheck, 
   Globe, 
   Save, 
@@ -15,8 +16,18 @@ import {
   RotateCcw,
   LogOut,
   UserCheck,
-  KeyRound
+  KeyRound,
+  Volume2,
+  VolumeX,
+  Sparkles
 } from 'lucide-react';
+import { 
+  getNotificationPermission, 
+  enableWebPushNotifications, 
+  showSystemPopupNotification, 
+  playEmergencyAlarmChime, 
+  stopEmergencyAlarmChime 
+} from '../../lib/notifications';
 
 export default function SettingsView({
   config,
@@ -54,6 +65,12 @@ export default function SettingsView({
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', phone_number: '', relationship: 'Escalation Contact' });
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [notificationPerm, setNotificationPerm] = useState('default');
+  const [isEnablingPush, setIsEnablingPush] = useState(false);
+
+  useEffect(() => {
+    setNotificationPerm(getNotificationPermission());
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -89,6 +106,31 @@ export default function SettingsView({
     });
     setNewContact({ name: '', phone_number: '', relationship: 'Escalation Contact' });
     setIsContactModalOpen(false);
+  };
+
+  const handleEnablePopupNotifications = async () => {
+    setIsEnablingPush(true);
+    try {
+      const res = await enableWebPushNotifications();
+      setNotificationPerm(getNotificationPermission());
+      setIsEnablingPush(false);
+      alert('Popup Notifications enabled! You will now receive system banners even when the app is minimized or closed.');
+    } catch (err) {
+      setIsEnablingPush(false);
+      alert(err.message || 'Failed to enable notifications');
+    }
+  };
+
+  const handleTestPopup = async () => {
+    const success = await showSystemPopupNotification({
+      title: '🚨 FireLine Emergency Alert Test',
+      body: 'Verified: System popup notification banner is functioning properly on this device.',
+      tag: 'test-popup'
+    });
+
+    if (!success) {
+      alert('Please enable popup notifications first using the "Turn On Background Popups" button.');
+    }
   };
 
   return (
@@ -148,8 +190,113 @@ export default function SettingsView({
         </div>
       </div>
 
+      {/* 1. NOTIFICATIONS & SYSTEM NATIVE POPUP ALERTS (PLACED FIRST) */}
+      <div className="rounded-[28px] border border-zinc-200/90 bg-white p-5 md:p-6 space-y-5 shadow-smart-card">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-zinc-950 text-[#c8ff00] flex items-center justify-center shadow-sm shrink-0">
+              <BellRing className="w-5 h-5 text-[#c8ff00]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-zinc-950">System Popup Notifications & Alerts</h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  notificationPerm === 'granted'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : 'bg-amber-100 text-amber-800 border border-amber-200'
+                }`}>
+                  {notificationPerm === 'granted' ? '● Popups Active' : '○ Popups Disabled'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500">
+                Receive instant OS popup banners on Windows, Android, and macOS even when FireLine is minimized or closed.
+              </p>
+            </div>
+          </div>
 
-      {/* 1. MQ-2 Sensor Thresholds (Gas Leak & Smoke Detector) */}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {notificationPerm !== 'granted' ? (
+              <button
+                type="button"
+                onClick={handleEnablePopupNotifications}
+                disabled={isEnablingPush}
+                className="px-4 py-2 rounded-xl text-xs font-black bg-zinc-950 hover:bg-zinc-800 text-[#c8ff00] flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-black/10 disabled:opacity-50"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isEnablingPush ? 'Activating Popups...' : 'Turn On Background Popups'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleTestPopup}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#c8ff00] hover:bg-[#b5e600] text-zinc-950 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              >
+                <Bell className="w-3.5 h-3.5" />
+                <span>Send Test Popup Banner</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Feature status grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+          {/* Web Push / OS Banner Box */}
+          <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/60 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-900 flex items-center gap-1.5">
+                <Bell className="w-3.5 h-3.5 text-zinc-600" />
+                <span>Background Web Push Service</span>
+              </span>
+              <span className="text-[10px] font-mono text-zinc-500">VAPID Protocol</span>
+            </div>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              When a critical gas leak or high temperature hazard occurs, the cloud dispatcher sends a wake-up signal to your device.
+            </p>
+            <div className="pt-1 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleTestPopup}
+                className="text-xs font-bold text-zinc-800 hover:text-black underline cursor-pointer"
+              >
+                Test system banner now &rarr;
+              </button>
+            </div>
+          </div>
+
+          {/* Acoustic Alarm Synthesizer Box */}
+          <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/60 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-900 flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5 text-red-600" />
+                <span>Emergency Audio Siren (Synthesizer)</span>
+              </span>
+              <span className="text-[10px] font-mono text-zinc-500">Web Audio API</span>
+            </div>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Pulsing high-frequency audio tone automatically triggered during active Danger alerts to alert nearby operators.
+            </p>
+            <div className="pt-1 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={playEmergencyAlarmChime}
+                className="px-3 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors cursor-pointer"
+              >
+                Test Siren
+              </button>
+              <button
+                type="button"
+                onClick={stopEmergencyAlarmChime}
+                className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-200 text-zinc-700 hover:bg-zinc-300 transition-colors cursor-pointer"
+              >
+                Silence
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      {/* 2. MQ-2 Sensor Thresholds (Gas Leak & Smoke Detector) */}
       <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 space-y-6 shadow-smart-card">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -229,7 +376,7 @@ export default function SettingsView({
               onChange={(e) => setForm({ ...form, smoke_danger_threshold: Number(e.target.value) })}
               className="w-full accent-red-600 cursor-pointer disabled:opacity-50"
             />
-            <p className="text-[11px] text-zinc-400">High combustion smoke threshold; sends an immediate push notification alert.</p>
+            <p className="text-[11px] text-zinc-400">High combustion smoke threshold; triggers emergency valve shutoff and alarm.</p>
           </div>
 
           {/* Smoke Watch Slider */}
@@ -253,7 +400,8 @@ export default function SettingsView({
         </div>
       </div>
 
-      {/* 2. DHT11 Sensor Thresholds (Temperature & Humidity) */}
+
+      {/* 3. DHT11 Temperature & Humidity Thresholds */}
       <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 space-y-6 shadow-smart-card">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-800">
@@ -325,60 +473,8 @@ export default function SettingsView({
         </div>
       </div>
 
-      {/* 3. System Watchdogs & Timers */}
-      <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 space-y-4 shadow-smart-card">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-800">
-            <Sliders className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-zinc-900">Safety Watchdogs & Alert Timers</h3>
-            <p className="text-xs text-zinc-400">Offline detection and escalation timings</p>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Offline Watchdog Timeout */}
-          <div className="space-y-2 p-4 rounded-2xl bg-zinc-50 border border-zinc-200/60">
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-zinc-700">ESP32 Offline Watchdog</span>
-              <span className="font-mono text-zinc-950">{form.offline_timeout_seconds}s</span>
-            </div>
-            <input
-              type="range"
-              min="30"
-              max="180"
-              step="5"
-              disabled={!isAdmin}
-              value={form.offline_timeout_seconds}
-              onChange={(e) => setForm({ ...form, offline_timeout_seconds: Number(e.target.value) })}
-              className="w-full accent-zinc-950 cursor-pointer disabled:opacity-50"
-            />
-            <p className="text-[11px] text-zinc-400">Time without sensor packet before declaring ESP32 offline.</p>
-          </div>
-
-          {/* Escalation Timeout */}
-          <div className="space-y-2 p-4 rounded-2xl bg-zinc-50 border border-zinc-200/60">
-            <div className="flex justify-between text-xs font-bold">
-              <span className="text-zinc-700">SMS Escalation Countdown</span>
-              <span className="font-mono text-zinc-950">{form.ack_timeout_seconds}s</span>
-            </div>
-            <input
-              type="range"
-              min="30"
-              max="300"
-              step="10"
-              disabled={!isAdmin}
-              value={form.ack_timeout_seconds}
-              onChange={(e) => setForm({ ...form, ack_timeout_seconds: Number(e.target.value) })}
-              className="w-full accent-zinc-950 cursor-pointer disabled:opacity-50"
-            />
-            <p className="text-[11px] text-zinc-400">Time before unacknowledged danger escalates to SMS.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Emergency Contacts & Escalation Order */}
+      {/* 4. Emergency Contacts & Escalation Order */}
       <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 space-y-4 shadow-smart-card">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -427,72 +523,7 @@ export default function SettingsView({
         </div>
       </div>
 
-      {/* 3. Notifications & Testing */}
-      <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 space-y-4 shadow-smart-card">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-800">
-            <Bell className="w-4 h-4" />
-          </div>
-          <h3 className="text-base font-bold text-zinc-900">Notifications & Alerts</h3>
-        </div>
-
-        {/* Web Push Subscription Action */}
-        <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <span className="text-sm font-bold text-zinc-900 block">Web Push Notifications</span>
-            <span className="text-xs text-zinc-500">Receive real-time push alerts on your phone or desktop even when the app is in the background.</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const { enableWebPushNotifications } = await import('@/lib/notifications');
-                await enableWebPushNotifications();
-                alert('Web Push Notifications successfully enabled for this device!');
-              } catch (err) {
-                alert(`Web Push error: ${err.message}`);
-              }
-            }}
-            className="px-4 py-2 rounded-full text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white shrink-0 transition-colors cursor-pointer shadow-sm"
-          >
-            Turn On Alerts
-          </button>
-        </div>
-
-        {/* Acoustic Chime Test */}
-        <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <span className="text-sm font-bold text-zinc-900 block">In-Browser Acoustic Alarm</span>
-            <span className="text-xs text-zinc-500">Pulsing audio chime generated during Danger states.</span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={async () => {
-                const { playEmergencyAlarmChime } = await import('@/lib/notifications');
-                playEmergencyAlarmChime();
-              }}
-              className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-            >
-              Test Alarm
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                const { stopEmergencyAlarmChime } = await import('@/lib/notifications');
-                stopEmergencyAlarmChime();
-              }}
-              className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-zinc-200 text-zinc-700 hover:bg-zinc-300 transition-colors"
-            >
-              Silence
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Language & Localization */}
+      {/* 5. Language & Localization */}
       <div className="rounded-[28px] border border-zinc-200/80 bg-white p-5 md:p-6 flex items-center justify-between shadow-smart-card">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-800">
@@ -518,22 +549,23 @@ export default function SettingsView({
       {isAdmin && (
         <div className="flex items-center justify-end gap-3 pt-2">
           {saveSuccess && (
-            <span className="text-xs text-emerald-600 flex items-center gap-1 font-bold">
-              <CheckCircle2 className="w-4 h-4" /> Configuration saved & synced!
-            </span>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Safety limits saved successfully</span>
+            </div>
           )}
+
           <button
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="h-11 px-6 rounded-full font-bold text-sm bg-zinc-950 hover:bg-zinc-800 text-white flex items-center gap-2 transition-all shadow-md disabled:opacity-50 cursor-pointer"
+            className="px-6 py-3 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-[#c8ff00] text-sm font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-black/10 disabled:opacity-50"
           >
-            <Save className="w-4 h-4 text-[#c8ff00]" />
-            <span>{isSaving ? 'Saving...' : 'Save Configuration'}</span>
+            <Save className="w-4 h-4" />
+            <span>{isSaving ? 'Saving...' : 'Save Safety Rules'}</span>
           </button>
         </div>
       )}
-
       {/* Add Contact Modal */}
       {isContactModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">

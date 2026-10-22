@@ -165,11 +165,23 @@ export default function App() {
     return () => clearInterval(timer);
   }, [syncData]);
 
+  const lastDangerPopupRef = React.useRef(null);
   useEffect(() => {
-    const hasActiveDanger = alerts.some(a => a.status === 'active' && a.level === 'danger');
-    if (hasActiveDanger) {
-      import('@/lib/notifications').then(n => n.playEmergencyAlarmChime()).catch(() => {});
+    const activeDanger = alerts.find(a => a.status === 'active' && a.level === 'danger');
+    if (activeDanger) {
+      import('@/lib/notifications').then(n => {
+        n.playEmergencyAlarmChime();
+        if (lastDangerPopupRef.current !== activeDanger.id) {
+          lastDangerPopupRef.current = activeDanger.id;
+          n.showSystemPopupNotification({
+            title: '🚨 CRITICAL GAS/FIRE DANGER',
+            body: `${activeDanger.message || 'Critical sensor threshold breached'}. Automatic shutoff commanded!`,
+            tag: `alert-${activeDanger.id}`
+          });
+        }
+      }).catch(() => {});
     } else {
+      lastDangerPopupRef.current = null;
       import('@/lib/notifications').then(n => n.stopEmergencyAlarmChime()).catch(() => {});
     }
   }, [alerts]);

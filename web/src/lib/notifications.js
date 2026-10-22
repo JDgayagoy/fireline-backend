@@ -1,5 +1,6 @@
 /**
- * Browser Web Push & Acoustic Alarm chime synthesizer
+ * Browser Web Push & System Native Popup Notification Service
+ * Supports OS desktop / mobile banners even when PWA is minimized or closed.
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -17,40 +18,122 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 /**
- * Register Service Worker and subscribe to Web Push
+ * Check current system notification permission state
+ */
+export function getNotificationPermission() {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'unsupported';
+  }
+  return Notification.permission; // 'granted' | 'denied' | 'default'
+}
+
+/**
+ * Register Service Worker and subscribe to Web Push & Native Popups
  */
 export async function enableWebPushNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    throw new Error('Push notifications are not supported by this browser.');
+  if (typeof window === 'undefined') return { success: false };
+
+  if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+    throw new Error('System popup notifications are not supported by this browser.');
   }
 
+  // 1. Request native OS permission
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    throw new Error('Notification permission was denied.');
+    throw new Error('Notification permission was denied. Please allow notifications in browser site settings.');
   }
 
+  // 2. Register Service Worker
   const registration = await navigator.serviceWorker.register('/sw.js');
   await navigator.serviceWorker.ready;
 
-  if (!VAPID_PUBLIC_KEY) {
-    console.log('Push permission granted (local mode).');
-    return { success: true, localOnly: true };
+  let subscription = null;
+
+  // 3. Subscribe to Web Push if VAPID key is configured
+  if (VAPID_PUBLIC_KEY && 'PushManager' in window) {
+    try {
+      const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey
+      });
+
+      // Post subscription to backend API
+      await fetch(`${API_BASE}/push/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+      }).catch((e) => console.warn('Failed to register subscription with backend:', e.message));
+    } catch (pushErr) {
+      console.warn('Push subscription note:', pushErr.message);
+    }
   }
 
-  const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey
+  // 4. Send an immediate native OS test popup confirmation
+  await showSystemPopupNotification({
+    title: '🔔 FireLine Safety Popups Active',
+    body: 'You will now receive instant system banners even when the app is minimized or running in the background.',
+    tag: 'fireline-welcome'
   });
 
-  // Post subscription to backend
-  await fetch(`${API_BASE}/push/subscribe`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(subscription)
-  });
+  return { success: true, permission, subscription };
+}
 
-  return { success: true, subscription };
+/**
+ * Displays an immediate Native OS System Popup Banner
+ * (Windows Action Center banner / Android lockscreen / macOS notification)
+ */
+export async function showSystemPopupNotification({
+  title = '🚨 Gas & Fire Safety Alert',
+  body = 'Elevated sensor reading recorded.',
+  icon = '/icon-192.png',
+  badge = '/icon-192.png',
+  tag = 'fireline-alert',
+  requireInteraction = true,
+  data = { url: '/' }
+} = {}) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+
+  if (Notification.permission !== 'granted') {
+    return false;
+  }
+
+  const options = {
+    body,
+    icon,
+    badge,
+    tag,
+    vibrate: [400, 150, 400, 150, 400],
+    requireInteraction, // Keeps notification on screen until user acts
+    renotify: true,
+    data
+  };
+
+  // Method 1: Use Service Worker registration (Works reliably in background / PWA mode)
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, options);
+        return true;
+      }
+    } catch (swErr) {
+      console.warn('Service worker notification fallback:', swErr);
+    }
+  }
+
+  // Method 2: Standard Notification constructor fallback
+  try {
+    const notification = new Notification(title, options);
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+    return true;
+  } catch (err) {
+    console.warn('Notification constructor error:', err);
+    return false;
+  }
 }
 
 /**
