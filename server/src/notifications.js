@@ -64,6 +64,8 @@ export async function dispatchWebPushAlert(alert) {
   await Promise.allSettled(sends);
 }
 
+import { memoryStore, supabase } from './db.js';
+
 /**
  * Dispatches Emergency SMS Escalation to contacts
  * Triggered when a Danger alert is unacknowledged past the timeout window
@@ -73,6 +75,30 @@ export async function dispatchSMSEscalation(contact, alert) {
 
   console.log(`📱 [SMS ESCALATION DISPATCH] Sending SMS to ${contact.name} (${contact.phone_number}): "${message}"`);
 
-  // Hardware SIM800L module on ESP32 handles direct cellular SMS delivery
-  console.log(`📡 [GSM SIM800L] Escalation SMS routed to hardware queue for ${contact.phone_number}`);
+  // Queue hardware command for ESP32 SIM800L module
+  const command = {
+    id: `cmd-sms-${Date.now()}`,
+    device_id: memoryStore.config?.device_id || 'esp32_main',
+    command: 'send_sms',
+    status: 'pending',
+    requested_by: 'system_watchdog',
+    requested_at: new Date().toISOString(),
+    payload: {
+      phone: contact.phone_number,
+      message
+    }
+  };
+
+  memoryStore.commands = memoryStore.commands || [];
+  memoryStore.commands.unshift(command);
+
+  if (supabase) {
+    try {
+      await supabase.from('commands').insert([command]);
+    } catch (e) {
+      console.warn('Failed to insert SMS command to Supabase:', e.message);
+    }
+  }
+
+  console.log(`📡 [GSM SIM800L] Escalation SMS command queued for ESP32: ${contact.phone_number}`);
 }

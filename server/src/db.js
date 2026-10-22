@@ -38,6 +38,7 @@ export const memoryStore = {
   readings: [],
   alerts: [],
   commands: [],
+  users: [],
   events: [
     {
       id: 'event-0',

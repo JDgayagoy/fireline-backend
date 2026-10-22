@@ -33,6 +33,222 @@ app.get('/health', (req, res) => {
 startWatchdogs();
 
 // ----------------------------------------------------------------------------
+// Authentication (Sign In & Sign Up with Supabase + In-Memory Fallback)
+// ----------------------------------------------------------------------------
+const AUTHORIZED_ACCOUNTS = {
+  'admin@test.com': {
+    email: 'admin@test.com',
+    passwords: ['1234', 'admin123'],
+    name: 'Safety Admin',
+    role: 'admin',
+    title: 'Operations Admin'
+  },
+  'superadmin@test.com': {
+    email: 'superadmin@test.com',
+    passwords: ['1234', 'admin123'],
+    name: 'Super Admin',
+    role: 'superadmin',
+    title: 'Root Supervisor'
+  }
+};
+
+// Sign In Endpoint (POST /api/auth/login and /api/auth/signin)
+const handleLogin = async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const rawPassword = String(password);
+
+  // 1. Check pre-configured default admin accounts
+  const defaultAccount = AUTHORIZED_ACCOUNTS[normalizedEmail];
+  if (defaultAccount && defaultAccount.passwords.includes(rawPassword)) {
+    const token = `fl_${Buffer.from(`${defaultAccount.email}:${Date.now()}`).toString('base64')}`;
+    return res.json({
+      success: true,
+      token,
+      user: {
+        email: defaultAccount.email,
+        name: defaultAccount.name,
+        role: defaultAccount.role,
+        title: defaultAccount.title
+      }
+    });
+  }
+
+  // 2. Check in-memory registered accounts
+  const memUser = (memoryStore.users || []).find(
+    u => u.email.toLowerCase() === normalizedEmail && u.password === rawPassword
+  );
+  if (memUser) {
+    const token = `fl_${Buffer.from(`${memUser.email}:${Date.now()}`).toString('base64')}`;
+    return res.json({
+      success: true,
+      token,
+      user: {
+        email: memUser.email,
+        name: memUser.name,
+        role: memUser.role || 'admin',
+        title: memUser.role === 'viewer' ? 'Safety Auditor' : 'Safety Officer'
+      }
+    });
+  }
+
+  // 3. Check Supabase Auth if connected
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: rawPassword
+      });
+
+      if (!error && data?.user) {
+        const role = data.user.user_metadata?.role || 'admin';
+        const name = data.user.user_metadata?.name || normalizedEmail.split('@')[0];
+        const token = data.session?.access_token || `fl_${Buffer.from(`${normalizedEmail}:${Date.now()}`).toString('base64')}`;
+
+        return res.json({
+          success: true,
+          token,
+          user: {
+            id: data.user.id,
+            email: data.user.email,
+            name,
+            role,
+            title: role === 'superadmin' ? 'Root Supervisor' : (role === 'viewer' ? 'Safety Auditor' : 'Safety Officer')
+          }
+        });
+      }
+    } catch (sbErr) {
+      console.warn('Supabase sign-in attempt error:', sbErr.message);
+    }
+  }
+
+  return res.status(401).json({ 
+    error: 'Invalid email or password. Please verify your credentials or create a new account.' 
+  });
+};
+
+app.post('/api/auth/login', handleLogin);
+app.post('/api/auth/signin', handleLogin);
+
+// Sign Up Endpoint (POST /api/auth/signup)
+app.post('/api/auth/signup', async (req, res) => {
+  const { email, password, name, role = 'admin' } = req.body || {};
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const rawPassword = String(password);
+  const fullName = String(name || '').trim() || normalizedEmail.split('@')[0];
+  const userRole = ['admin', 'viewer', 'superadmin'].includes(role) ? role : 'admin';
+
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    return res.status(400).json({ error: 'Please provide a valid email address.' });
+  }
+
+  // Password length validation
+  if (rawPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+  }
+
+  // Check if account already exists in default accounts
+  if (AUTHORIZED_ACCOUNTS[normalizedEmail]) {
+    return res.status(409).json({ error: 'An account with this email already exists.' });
+  }
+
+  // Check if account already exists in memory store
+  const existingMem = (memoryStore.users || []).find(u => u.email.toLowerCase() === normalizedEmail);
+  if (existingMem) {
+    return res.status(409).json({ error: 'An account with this email already exists.' });
+  }
+
+  let createdUser = {
+    email: normalizedEmail,
+    name: fullName,
+    role: userRole,
+    title: userRole === 'superadmin' ? 'Root Supervisor' : (userRole === 'viewer' ? 'Safety Auditor' : 'Safety Officer'),
+    created_at: new Date().toISOString()
+  };
+
+  // 1. Register with Supabase Auth if available
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: normalizedEmail,
+        password: rawPassword,
+        email_confirm: true,
+        user_metadata: {
+          name: fullName,
+          role: userRole,
+          title: createdUser.title
+        }
+      });
+
+      if (error) {
+        if (error.message?.toLowerCase().includes('already') || error.status === 422) {
+          return res.status(409).json({ error: 'An account with this email already exists.' });
+        }
+        console.warn('Supabase admin create user failed, continuing with memory fallback:', error.message);
+      } else if (data?.user) {
+        createdUser.id = data.user.id;
+      }
+    } catch (sbErr) {
+      console.warn('Supabase auth signup error:', sbErr.message);
+    }
+  }
+
+  // 2. Persist in memory store
+  memoryStore.users = memoryStore.users || [];
+  memoryStore.users.push({
+    ...createdUser,
+    password: rawPassword
+  });
+
+  // 3. Log event
+  memoryStore.events.unshift({
+    id: `event-${Date.now()}`,
+    created_at: new Date().toISOString(),
+    event_type: 'user_registered',
+    severity: 'info',
+    summary: `New safety account registered: ${fullName} (${userRole})`,
+    details: { email: normalizedEmail, role: userRole },
+    actor: fullName
+  });
+
+  const token = `fl_${Buffer.from(`${normalizedEmail}:${Date.now()}`).toString('base64')}`;
+
+  return res.status(201).json({
+    success: true,
+    message: 'Account created successfully',
+    token,
+    user: createdUser
+  });
+});
+
+app.get('/api/auth/verify', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Missing authorization header' });
+  }
+  res.json({ success: true, valid: true });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Missing authorization header' });
+  }
+  res.json({ success: true, authenticated: true });
+});
+
+// ----------------------------------------------------------------------------
 // Web Push Subscription
 // ----------------------------------------------------------------------------
 app.post('/api/push/subscribe', (req, res) => {
@@ -63,6 +279,8 @@ app.get('/api/status', (req, res) => {
     rssi: memoryStore.deviceStatus.rssi,
     uptime: memoryStore.deviceStatus.uptime,
     firmware_version: memoryStore.deviceStatus.firmware_version,
+    sms_last_status: memoryStore.deviceStatus.sms_last_status || 'none',
+    warming_up: Boolean(memoryStore.deviceStatus.warming_up),
     activeAlertsCount: memoryStore.alerts.filter(a => a.status === 'active').length,
     pendingCommandsCount: memoryStore.commands.filter(c => c.status === 'pending').length
   });
@@ -89,6 +307,15 @@ app.post('/api/readings', async (req, res) => {
     if (rssi !== undefined) memoryStore.deviceStatus.rssi = Number(rssi);
     if (uptime !== undefined) memoryStore.deviceStatus.uptime = Number(uptime);
     if (firmware_version) memoryStore.deviceStatus.firmware_version = firmware_version;
+    if (req.body.valve_closed !== undefined) {
+      memoryStore.deviceStatus.valveState = req.body.valve_closed ? 'closed' : 'open';
+    }
+    if (req.body.sms_last_status !== undefined) {
+      memoryStore.deviceStatus.sms_last_status = req.body.sms_last_status;
+    }
+    if (req.body.warming_up !== undefined) {
+      memoryStore.deviceStatus.warming_up = req.body.warming_up;
+    }
 
     if (wasOffline) {
       console.log('💚 ESP32 Device is now ONLINE and reporting readings.');
@@ -292,7 +519,7 @@ app.get('/api/commands', (req, res) => {
 app.post('/api/commands', async (req, res) => {
   try {
     const { command, requested_by = 'admin', payload = {} } = req.body;
-    const validCommands = ['close_valve', 'open_valve', 'calibrate_sensor', 'reboot_device'];
+    const validCommands = ['close_valve', 'open_valve', 'calibrate_sensor', 'reboot_device', 'send_sms'];
 
     if (!validCommands.includes(command)) {
       return res.status(400).json({ error: `Invalid command. Allowed: ${validCommands.join(', ')}` });
@@ -389,7 +616,10 @@ app.post('/api/commands/:id/result', async (req, res) => {
 // Config (Device Thresholds & Settings)
 // ----------------------------------------------------------------------------
 app.get('/api/config', (req, res) => {
-  res.json(memoryStore.config);
+  res.json({
+    ...memoryStore.config,
+    gas_adc_danger_threshold: memoryStore.config.gas_adc_danger_threshold || memoryStore.config.gas_danger_threshold
+  });
 });
 
 app.put('/api/config', async (req, res) => {
