@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Bot, User, Info, Loader2 } from 'lucide-react';
 import { sendAIChatMessage } from '@/lib/api';
+import MarkdownMessage from '../markdown-message';
 
 export default function AssistantView({
   status,
@@ -139,13 +140,13 @@ export default function AssistantView({
                 {m.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
               </div>
 
-              <div className={`p-4 text-sm ${
+              <div className={`p-4 text-xs max-w-full ${
                 m.sender === 'user'
-                  ? 'bg-zinc-950 text-white rounded-2xl rounded-tr-xs shadow-sm'
-                  : 'bg-zinc-100/80 text-zinc-900 rounded-2xl rounded-tl-xs whitespace-pre-line'
+                  ? 'bg-zinc-950 text-white rounded-2xl rounded-tr-xs shadow-sm font-medium text-sm'
+                  : 'bg-zinc-50 border border-zinc-200/80 text-zinc-900 rounded-2xl rounded-tl-xs shadow-xs'
               }`}>
-                <p className="leading-relaxed">{m.text}</p>
-                <span className={`block text-[10px] mt-1.5 font-mono ${
+                <MarkdownMessage content={m.text} isUser={m.sender === 'user'} />
+                <span className={`block text-[10px] mt-2 font-mono ${
                   m.sender === 'user' ? 'text-zinc-400 text-right' : 'text-zinc-400'
                 }`}>
                   {m.timestamp}
