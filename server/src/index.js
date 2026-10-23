@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { memoryStore, supabase } from './db.js';
+import crypto from 'crypto';
+import { memoryStore, supabase, persistStore } from './db.js';
 import { startWatchdogs } from './watchdog.js';
 import { generateIncidentSummary, handleAIChatQuery } from './ai.js';
 import { addPushSubscription, dispatchWebPushAlert, dispatchSMSEscalation } from './notifications.js';
@@ -544,13 +545,23 @@ app.post('/api/commands', async (req, res) => {
 
     memoryStore.commands.unshift(newCmd);
 
+    if (command === 'calibrate_sensor') {
+      const baselineVal = Number(payload.clean_air_baseline) 
+        || (memoryStore.readings[0] ? Math.round(memoryStore.readings[0].gas_ppm) : 85);
+      memoryStore.config.clean_air_baseline = baselineVal;
+      memoryStore.config.last_calibrated_at = new Date().toISOString();
+      persistStore();
+    }
+
     // Log event
     const event = {
       id: `evt-${Date.now()}`,
       created_at: new Date().toISOString(),
-      event_type: 'valve_command_queued',
+      event_type: command === 'calibrate_sensor' ? 'calibration' : 'valve_command_queued',
       severity: command === 'close_valve' ? 'warning' : 'info',
-      summary: `Command queued: ${command.replace('_', ' ').toUpperCase()} by ${requested_by}`,
+      summary: command === 'calibrate_sensor' 
+        ? `Clean-air baseline calibrated to ${memoryStore.config.clean_air_baseline} PPM by ${requested_by}`
+        : `Command queued: ${command.replace('_', ' ').toUpperCase()} by ${requested_by}`,
       details: { command, payload },
       actor: requested_by
     };
@@ -561,7 +572,7 @@ app.post('/api/commands', async (req, res) => {
       await supabase.from('events').insert([event]);
     }
 
-    res.status(201).json({ success: true, command: newCmd });
+    res.status(201).json({ success: true, command: newCmd, config: memoryStore.config });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -611,9 +622,17 @@ app.post('/api/commands/:id/result', async (req, res) => {
       };
       memoryStore.events.unshift(event);
       if (supabase) await supabase.from('events').insert([event]);
+    } else if (cmd.command === 'calibrate_sensor' && cmd.status === 'executed') {
+      if (cmd.payload && cmd.payload.clean_air_baseline) {
+        memoryStore.config.clean_air_baseline = Number(cmd.payload.clean_air_baseline);
+      } else if (memoryStore.readings[0]) {
+        memoryStore.config.clean_air_baseline = Math.round(memoryStore.readings[0].gas_ppm);
+      }
+      memoryStore.config.last_calibrated_at = new Date().toISOString();
+      persistStore();
     }
 
-    res.json({ success: true, command: cmd, valveState: memoryStore.deviceStatus.valveState });
+    res.json({ success: true, command: cmd, valveState: memoryStore.deviceStatus.valveState, config: memoryStore.config });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -631,7 +650,21 @@ app.get('/api/config', (req, res) => {
 
 app.put('/api/config', async (req, res) => {
   try {
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    // If contacts list is passed with configuration save, persist it atomically
+    if (Array.isArray(updates.contacts)) {
+      memoryStore.contacts = updates.contacts.map(c => ({
+        ...c,
+        id: (c.id && typeof c.id === 'string' && c.id.includes('-') && c.id.length >= 32)
+          ? c.id
+          : crypto.randomUUID(),
+        priority: Number(c.priority) || 1,
+        is_active: c.is_active !== false
+      }));
+      delete updates.contacts;
+    }
+
     Object.assign(memoryStore.config, updates, { updated_at: new Date().toISOString() });
 
     const event = {
@@ -645,12 +678,18 @@ app.put('/api/config', async (req, res) => {
     };
     memoryStore.events.unshift(event);
 
+    persistStore();
+
     if (supabase) {
-      await supabase.from('config').update(updates).eq('id', 1);
-      await supabase.from('events').insert([event]);
+      try {
+        await supabase.from('config').update(updates).eq('id', 1);
+        await supabase.from('events').insert([event]);
+      } catch (sbErr) {
+        console.warn('Supabase config update note:', sbErr.message);
+      }
     }
 
-    res.json({ success: true, config: memoryStore.config });
+    res.json({ success: true, config: memoryStore.config, contacts: memoryStore.contacts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -740,8 +779,9 @@ app.get('/api/contacts', async (req, res) => {
   if (supabase) {
     try {
       const { data, error } = await supabase.from('contacts').select('*').order('priority', { ascending: true });
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         memoryStore.contacts = data;
+        persistStore();
       }
     } catch (e) {
       console.warn('Supabase contacts fetch fallback:', e.message);
@@ -753,7 +793,7 @@ app.get('/api/contacts', async (req, res) => {
 });
 
 app.post('/api/contacts', async (req, res) => {
-  const { name, phone_number, relationship, priority = 1, is_active = true } = req.body;
+  const { id, name, phone_number, relationship, priority = 1, is_active = true } = req.body;
   if (!name || !phone_number) {
     return res.status(400).json({ error: 'Name and phone number are required' });
   }
@@ -766,21 +806,38 @@ app.post('/api/contacts', async (req, res) => {
   const contactPriority = Number(priority) || (memoryStore.contacts.length === 0 ? 1 : 2);
   const defaultRel = contactPriority === 1 ? 'Primary Safety Contact' : 'Secondary Escalation Contact';
 
+  // Generate a valid RFC4122 UUID for database compatibility
+  const contactId = (id && typeof id === 'string' && id.includes('-') && id.length >= 32)
+    ? id
+    : crypto.randomUUID();
+
   const contact = {
-    id: `contact-${Date.now()}`,
+    id: contactId,
     name: String(name).trim(),
     phone_number: cleanPhone,
     relationship: relationship?.trim() || defaultRel,
     priority: contactPriority,
-    is_active: is_active !== false
+    is_active: is_active !== false,
+    created_at: new Date().toISOString()
   };
 
   memoryStore.contacts = memoryStore.contacts || [];
-  memoryStore.contacts.push(contact);
+  
+  // Update in place if already exists, otherwise append
+  const existingIdx = memoryStore.contacts.findIndex(c => String(c.id) === String(contact.id));
+  if (existingIdx !== -1) {
+    memoryStore.contacts[existingIdx] = contact;
+  } else {
+    memoryStore.contacts.push(contact);
+  }
+  persistStore();
 
   if (supabase) {
     try {
-      await supabase.from('contacts').insert([contact]);
+      const { error } = await supabase.from('contacts').insert([contact]);
+      if (error) {
+        console.warn('Supabase contact insert note:', error.message);
+      }
     } catch (e) {
       console.warn('Supabase contact insert note:', e.message);
     }
@@ -815,10 +872,14 @@ app.patch('/api/contacts/:id', async (req, res) => {
     ...memoryStore.contacts[idx],
     ...updates
   };
+  persistStore();
 
   if (supabase) {
     try {
-      await supabase.from('contacts').update(updates).eq('id', id);
+      const { error } = await supabase.from('contacts').update(updates).eq('id', id);
+      if (error) {
+        console.warn('Supabase contact update note:', error.message);
+      }
     } catch (e) {
       console.warn('Supabase contact update note:', e.message);
     }
@@ -834,16 +895,21 @@ app.delete('/api/contacts/:id', async (req, res) => {
   const initialLength = memoryStore.contacts.length;
   memoryStore.contacts = memoryStore.contacts.filter(c => String(c.id) !== String(id));
 
+  if (memoryStore.contacts.length === initialLength) {
+    return res.status(404).json({ error: 'Contact not found' });
+  }
+
+  persistStore();
+
   if (supabase) {
     try {
-      await supabase.from('contacts').delete().eq('id', id);
+      const { error } = await supabase.from('contacts').delete().eq('id', id);
+      if (error) {
+        console.warn('Supabase contact delete note:', error.message);
+      }
     } catch (e) {
       console.warn('Supabase contact delete note:', e.message);
     }
-  }
-
-  if (memoryStore.contacts.length === initialLength) {
-    return res.status(404).json({ error: 'Contact not found' });
   }
 
   console.log(`🗑️ Emergency contact deleted: ${id}`);

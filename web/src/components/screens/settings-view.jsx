@@ -23,7 +23,8 @@ import {
   Trash2,
   Star,
   ShieldAlert,
-  Check
+  Check,
+  Pencil
 } from 'lucide-react';
 import { 
   getNotificationPermission, 
@@ -35,6 +36,7 @@ import {
 
 export default function SettingsView({
   config,
+  readings = [],
   onUpdateConfig,
   contacts = [],
   onAddContact,
@@ -69,6 +71,7 @@ export default function SettingsView({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState(null);
   const [newContact, setNewContact] = useState({ name: '', phone_number: '', relationship: '', priority: 1 });
   const [deletingContactId, setDeletingContactId] = useState(null);
   const [isCalibrating, setIsCalibrating] = useState(false);
@@ -79,10 +82,33 @@ export default function SettingsView({
     setNotificationPerm(getNotificationPermission());
   }, []);
 
+  // Synchronize form when config updates from server or localStorage cache
+  useEffect(() => {
+    if (config) {
+      setForm(prev => ({
+        ...prev,
+        gas_watch_threshold: config.gas_watch_threshold ?? prev.gas_watch_threshold,
+        gas_danger_threshold: config.gas_danger_threshold ?? prev.gas_danger_threshold,
+        smoke_watch_threshold: config.smoke_watch_threshold ?? prev.smoke_watch_threshold,
+        smoke_danger_threshold: config.smoke_danger_threshold ?? prev.smoke_danger_threshold,
+        temp_watch_threshold: config.temp_watch_threshold ?? prev.temp_watch_threshold,
+        temp_danger_threshold: config.temp_danger_threshold ?? prev.temp_danger_threshold,
+        humidity_watch_threshold: config.humidity_watch_threshold ?? prev.humidity_watch_threshold,
+        clean_air_baseline: config.clean_air_baseline ?? prev.clean_air_baseline,
+        offline_timeout_seconds: config.offline_timeout_seconds ?? prev.offline_timeout_seconds,
+        ack_timeout_seconds: config.ack_timeout_seconds ?? prev.ack_timeout_seconds,
+        quiet_hours_enabled: config.quiet_hours_enabled ?? prev.quiet_hours_enabled,
+        quiet_hours_start: config.quiet_hours_start ?? prev.quiet_hours_start,
+        quiet_hours_end: config.quiet_hours_end ?? prev.quiet_hours_end,
+        maintenance_mode: config.maintenance_mode ?? prev.maintenance_mode
+      }));
+    }
+  }, [config]);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onUpdateConfig(form);
+      await onUpdateConfig({ ...form, contacts });
       setIsSaving(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -95,22 +121,69 @@ export default function SettingsView({
   const handleCalibrateBaseline = async () => {
     setIsCalibrating(true);
     try {
-      await onQueueCommand('calibrate_sensor');
-      setTimeout(() => {
-        setIsCalibrating(false);
-        alert('Clean-air baseline sampling initiated on ESP32.');
-      }, 1500);
+      // Sample clean-air baseline from current readings or fallback to current baseline
+      const latestGas = (readings && readings[0] && typeof readings[0].gas_ppm === 'number')
+        ? readings[0].gas_ppm
+        : (form.clean_air_baseline || 85);
+      const sampledBaseline = Math.max(25, Math.min(200, Math.round(latestGas)));
+
+      const updatedForm = {
+        ...form,
+        clean_air_baseline: sampledBaseline,
+        last_calibrated_at: new Date().toISOString()
+      };
+      setForm(updatedForm);
+
+      // Persist to server and client cache immediately
+      await onUpdateConfig({ ...updatedForm, contacts });
+
+      // Queue command to hardware with sampled baseline payload
+      if (onQueueCommand) {
+        await onQueueCommand('calibrate_sensor', { clean_air_baseline: sampledBaseline });
+      }
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      setIsCalibrating(false);
     } catch (err) {
+      console.warn('Calibration error:', err);
       setIsCalibrating(false);
     }
   };
 
+  const handleOpenAddContact = () => {
+    setEditingContact(null);
+    setNewContact({ name: '', phone_number: '', relationship: '', priority: 1 });
+    setIsContactModalOpen(true);
+  };
+
+  const handleStartEditContact = (contact) => {
+    setEditingContact(contact);
+    setNewContact({
+      name: contact.name || '',
+      phone_number: contact.phone_number || '',
+      relationship: contact.relationship || '',
+      priority: Number(contact.priority) || 1
+    });
+    setIsContactModalOpen(true);
+  };
+
   const handleSaveContact = async () => {
     if (!newContact.name || !newContact.phone_number) return;
-    await onAddContact({
-      ...newContact,
-      priority: Number(newContact.priority) || 1
-    });
+    if (editingContact && onUpdateContact) {
+      await onUpdateContact(editingContact.id, {
+        name: newContact.name.trim(),
+        phone_number: newContact.phone_number.trim(),
+        relationship: newContact.relationship.trim(),
+        priority: Number(newContact.priority) || 1
+      });
+    } else {
+      await onAddContact({
+        ...newContact,
+        priority: Number(newContact.priority) || 1
+      });
+    }
+    setEditingContact(null);
     setNewContact({ name: '', phone_number: '', relationship: '', priority: 1 });
     setIsContactModalOpen(false);
   };
@@ -425,6 +498,44 @@ export default function SettingsView({
             />
             <p className="text-[11px] text-zinc-400">Early warning for smoldering smoke; dispatches an advisory push notification.</p>
           </div>
+
+          {/* Clean-Air Baseline (R0 Calibration Reference) */}
+          <div className="space-y-2 p-4 rounded-2xl bg-zinc-50 border border-zinc-200/60 md:col-span-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs font-bold">
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-700">Clean-Air Baseline (R0 Sensor Reference)</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Calibrated
+                </span>
+              </div>
+              <div className="flex items-center gap-2 font-mono text-zinc-950 text-xs">
+                <span className="font-bold text-emerald-800 text-sm">{form.clean_air_baseline || 85} PPM</span>
+                {readings && readings[0] && typeof readings[0].gas_ppm === 'number' && (
+                  <span className="text-[11px] font-sans text-zinc-400 font-normal">
+                    (Current live: {readings[0].gas_ppm} PPM)
+                  </span>
+                )}
+              </div>
+            </div>
+            <input
+              type="range"
+              min="20"
+              max="160"
+              step="1"
+              disabled={!isAdmin}
+              value={form.clean_air_baseline || 85}
+              onChange={(e) => setForm({ ...form, clean_air_baseline: Number(e.target.value) })}
+              className="w-full accent-emerald-600 cursor-pointer disabled:opacity-50"
+            />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-zinc-400 gap-1 pt-0.5">
+              <span>Zero-point reference for MQ-2 tin dioxide (SnO2) heating sensor in uncontaminated fresh air.</span>
+              {config?.last_calibrated_at && (
+                <span className="text-zinc-500 font-medium shrink-0">
+                  Last calibrated: {new Date(config.last_calibrated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -519,7 +630,7 @@ export default function SettingsView({
           {isAdmin && (
             <button
               type="button"
-              onClick={() => setIsContactModalOpen(true)}
+              onClick={handleOpenAddContact}
               className="px-4 py-1.5 rounded-full text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm self-start sm:self-auto"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -591,6 +702,17 @@ export default function SettingsView({
                       </button>
                     )}
 
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditContact(contact)}
+                        className="w-8 h-8 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900 border border-zinc-200 transition-colors flex items-center justify-center cursor-pointer shadow-sm"
+                        title={`Edit ${contact.name}`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     <a
                       href={`tel:${contact.phone_number}`}
                       className="w-8 h-8 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-emerald-600 hover:bg-zinc-50 transition-colors shadow-sm"
@@ -646,7 +768,7 @@ export default function SettingsView({
           {saveSuccess && (
             <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 animate-in fade-in">
               <CheckCircle2 className="w-4 h-4" />
-              <span>Safety limits saved successfully</span>
+              <span>Safety limits & contacts saved successfully</span>
             </div>
           )}
 
@@ -661,13 +783,17 @@ export default function SettingsView({
           </button>
         </div>
       )}
-      {/* Add Contact Modal */}
+      {/* Add / Edit Contact Modal */}
       {isContactModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md rounded-[28px] border border-zinc-200 bg-white p-6 shadow-2xl text-zinc-950 space-y-4">
             <div>
-              <h3 className="text-base font-black text-zinc-950">Add Emergency Contact</h3>
-              <p className="text-xs text-zinc-400">Configure phone number for hardware GSM SMS alerts</p>
+              <h3 className="text-base font-black text-zinc-950">
+                {editingContact ? 'Edit Emergency Contact' : 'Add Emergency Contact'}
+              </h3>
+              <p className="text-xs text-zinc-400">
+                {editingContact ? 'Update contact details and SMS alert response priority' : 'Configure phone number for hardware GSM SMS alerts'}
+              </p>
             </div>
 
             <div className="space-y-3">
@@ -751,8 +877,11 @@ export default function SettingsView({
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setIsContactModalOpen(false)}
-                className="h-10 px-4 rounded-full text-xs font-bold text-zinc-500 hover:text-zinc-900 transition-colors"
+                onClick={() => {
+                  setIsContactModalOpen(false);
+                  setEditingContact(null);
+                }}
+                className="h-10 px-4 rounded-full text-xs font-bold text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -762,7 +891,7 @@ export default function SettingsView({
                 disabled={!newContact.name || !newContact.phone_number}
                 className="h-10 px-5 rounded-full text-xs font-bold bg-zinc-950 hover:bg-zinc-800 text-white transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
               >
-                Save Contact
+                {editingContact ? 'Update Contact' : 'Save Contact'}
               </button>
             </div>
           </div>

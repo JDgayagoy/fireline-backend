@@ -112,6 +112,21 @@ export default function App() {
   const [contacts, setContacts] = useState([]);
   const [isBrowserOffline, setIsBrowserOffline] = useState(false);
 
+  // Load cached config on initial mount so calibrations never flicker or reset
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('cached_config');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed === 'object') {
+            setConfig(prev => ({ ...prev, ...parsed }));
+          }
+        }
+      } catch (_) {}
+    }
+  }, []);
+
   // Network offline listener
   useEffect(() => {
     const handleOnline = () => setIsBrowserOffline(false);
@@ -211,12 +226,28 @@ export default function App() {
   };
 
   const handleUpdateConfig = async (newConfig) => {
-    await updateConfig(newConfig);
+    const payload = {
+      ...newConfig,
+      contacts: contacts
+    };
+    await updateConfig(payload);
     await syncData();
   };
 
   const handleAddContact = async (newContact) => {
-    await addContact(newContact);
+    const contactWithId = {
+      ...newContact,
+      id: newContact.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `contact-${Date.now()}`)
+    };
+    setContacts(prev => {
+      const exists = prev.some(c => String(c.id) === String(contactWithId.id));
+      return exists ? prev.map(c => String(c.id) === String(contactWithId.id) ? contactWithId : c) : [...prev, contactWithId];
+    });
+    try {
+      await addContact(contactWithId);
+    } catch (e) {
+      console.warn('Add contact note:', e.message);
+    }
     await syncData();
   };
 
@@ -240,8 +271,8 @@ export default function App() {
     await syncData();
   };
 
-  const handleQueueCommand = async (cmd) => {
-    await queueCommand(cmd, 'admin');
+  const handleQueueCommand = async (cmd, payload = {}) => {
+    await queueCommand(cmd, currentUser?.email || 'admin', payload);
     await syncData();
   };
 
@@ -513,6 +544,7 @@ export default function App() {
           {activeTab === 'settings' && (
             <SettingsView
               config={config}
+              readings={readings}
               onUpdateConfig={handleUpdateConfig}
               contacts={contacts}
               onAddContact={handleAddContact}
