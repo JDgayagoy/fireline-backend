@@ -51,12 +51,12 @@ export default function SettingsView({
   onQueueCommand
 }) {
   const [form, setForm] = useState({
-    gas_watch_threshold: config?.gas_watch_threshold || 150,
-    gas_danger_threshold: config?.gas_danger_threshold || 300,
-    smoke_watch_threshold: config?.smoke_watch_threshold || 100,
-    smoke_danger_threshold: config?.smoke_danger_threshold || 250,
-    temp_watch_threshold: config?.temp_watch_threshold || 45,
-    temp_danger_threshold: config?.temp_danger_threshold || 60,
+    gas_watch_threshold: config?.gas_watch_threshold || 30,
+    gas_danger_threshold: config?.gas_danger_threshold || 50,
+    smoke_watch_threshold: config?.smoke_watch_threshold || 30,
+    smoke_danger_threshold: config?.smoke_danger_threshold || 50,
+    temp_watch_threshold: config?.temp_watch_threshold || 40,
+    temp_danger_threshold: config?.temp_danger_threshold || 50,
     humidity_watch_threshold: config?.humidity_watch_threshold || 80,
     clean_air_baseline: config?.clean_air_baseline || 85,
     offline_timeout_seconds: config?.offline_timeout_seconds || 60,
@@ -431,7 +431,7 @@ export default function SettingsView({
             </div>
             <input
               type="range"
-              min="100"
+              min="20"
               max="600"
               step="10"
               disabled={!isAdmin}
@@ -450,7 +450,7 @@ export default function SettingsView({
             </div>
             <input
               type="range"
-              min="50"
+              min="10"
               max="300"
               step="5"
               disabled={!isAdmin}
@@ -469,7 +469,7 @@ export default function SettingsView({
             </div>
             <input
               type="range"
-              min="150"
+              min="20"
               max="500"
               step="10"
               disabled={!isAdmin}
@@ -488,7 +488,7 @@ export default function SettingsView({
             </div>
             <input
               type="range"
-              min="50"
+              min="10"
               max="200"
               step="5"
               disabled={!isAdmin}

@@ -57,12 +57,12 @@ export async function fetchConfig() {
   }
 
   return {
-    gas_watch_threshold: 150,
-    gas_danger_threshold: 300,
-    smoke_watch_threshold: 100,
-    smoke_danger_threshold: 250,
-    temp_watch_threshold: 45,
-    temp_danger_threshold: 60,
+    gas_watch_threshold: 30,
+    gas_danger_threshold: 50,
+    smoke_watch_threshold: 30,
+    smoke_danger_threshold: 50,
+    temp_watch_threshold: 40,
+    temp_danger_threshold: 50,
     humidity_watch_threshold: 80,
     clean_air_baseline: 85,
     offline_timeout_seconds: 60,

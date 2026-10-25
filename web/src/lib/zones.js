@@ -29,12 +29,12 @@ export function getOverallZone({
     };
   }
 
-  const gasDanger = config.gas_danger_threshold || 300;
-  const tempDanger = config.temp_danger_threshold || 60;
-  const smokeDanger = config.smoke_danger_threshold || 250;
-  const gasWatch = config.gas_watch_threshold || 150;
-  const tempWatch = config.temp_watch_threshold || 45;
-  const smokeWatch = config.smoke_watch_threshold || 100;
+  const gasDanger = config.gas_danger_threshold || 50;
+  const tempDanger = config.temp_danger_threshold || 50;
+  const smokeDanger = config.smoke_danger_threshold || 50;
+  const gasWatch = config.gas_watch_threshold || 30;
+  const tempWatch = config.temp_watch_threshold || 40;
+  const smokeWatch = config.smoke_watch_threshold || 30;
   const humidityWatch = config.humidity_watch_threshold || 80;
 
   // 2. Check Danger Thresholds (MQ-2 Gas, MQ-2 Smoke, DHT11 Temperature)

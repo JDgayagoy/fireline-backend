@@ -2,12 +2,13 @@
   "config": {
     "id": 1,
     "device_id": "esp32_main",
-    "gas_watch_threshold": 150,
-    "gas_danger_threshold": 300,
-    "smoke_watch_threshold": 100,
-    "smoke_danger_threshold": 250,
-    "temp_watch_threshold": 45,
-    "temp_danger_threshold": 60,
+    "gas_watch_threshold": 30,
+    "gas_danger_threshold": 50,
+    "gas_adc_danger_threshold": 50,
+    "smoke_watch_threshold": 30,
+    "smoke_danger_threshold": 50,
+    "temp_watch_threshold": 40,
+    "temp_danger_threshold": 50,
     "clean_air_baseline": 85,
     "offline_timeout_seconds": 60,
     "ack_timeout_seconds": 120,
@@ -41,10 +42,10 @@
       "created_at": "2026-10-23T01:25:31.587Z",
       "event_type": "config_updated",
       "severity": "info",
-      "summary": "System initialized with safety rules: Gas Danger > 300 PPM, Temp Danger > 60°C",
+      "summary": "System initialized with safety rules: Gas Danger > 50 PPM, Temp Danger > 50°C",
       "details": {
-        "gas_danger": 300,
-        "temp_danger": 60
+        "gas_danger": 50,
+        "temp_danger": 50
       },
       "actor": "system"
     }

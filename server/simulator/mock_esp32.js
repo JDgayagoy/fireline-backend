@@ -29,8 +29,8 @@ console.log(`⚙️ Simulation Mode: ${mode.toUpperCase()} (options: --leak, --f
 console.log('=====================================================');
 
 let config = {
-  gas_danger_threshold: 300,
-  temp_danger_threshold: 60,
+  gas_danger_threshold: 50,
+  temp_danger_threshold: 50,
   clean_air_baseline: 85
 };
 
