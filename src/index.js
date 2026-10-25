@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { memoryStore, supabase, persistStore } from './db.js';
 import { startWatchdogs } from './watchdog.js';
 import { generateIncidentSummary, handleAIChatQuery } from './ai.js';
-import { addPushSubscription, dispatchWebPushAlert, dispatchSMSEscalation } from './notifications.js';
+import { addPushSubscription, dispatchWebPushAlert, dispatchSMSEscalation, dispatchSirenSMS } from './notifications.js';
 
 dotenv.config();
 
@@ -435,6 +435,9 @@ app.post('/api/readings', async (req, res) => {
         for (const contact of primaryContacts) {
           dispatchSMSEscalation(contact, dangerAlert).catch(err => console.error('Primary SMS dispatch error:', err));
         }
+
+        // Alongside primary: immediately dispatch siren alarm command (+639774719787: "1234#ON#")
+        dispatchSirenSMS(dangerAlert).catch(err => console.error('Siren SMS dispatch error:', err));
       }
     } else if (isGasWatch || isTempWatch) {
       // Watch Alert Trigger
