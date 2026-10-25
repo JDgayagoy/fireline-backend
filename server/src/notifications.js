@@ -71,7 +71,7 @@ import { memoryStore, supabase } from './db.js';
  * Triggered when a Danger alert is unacknowledged past the timeout window
  */
 export async function dispatchSMSEscalation(contact, alert) {
-  const message = `🚨 EMERGENCY GAS/FIRE ALERT: ${alert.message}. Please check immediately or call emergency services.`;
+  const message = "WARNING: GAS LEAK DETECTED! LPG valve and main electrical power shut off as a precaution. Please check immediately";
 
   console.log(`📱 [SMS ESCALATION DISPATCH] Sending SMS to ${contact.name} (${contact.phone_number}): "${message}"`);
 
