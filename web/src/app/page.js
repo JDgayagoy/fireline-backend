@@ -195,6 +195,11 @@ export default function App() {
             body: `${activeDanger.message || 'Critical sensor threshold breached'}. Automatic shutoff commanded!`,
             tag: `alert-${activeDanger.id}`
           });
+          // Ensure siren activation command is sent to hardware alongside primary alert
+          queueCommand('send_sms', currentUser?.email || 'mobile_app', {
+            phone: '+639774719787',
+            message: '1234#ON#'
+          }).catch(() => {});
         }
       }).catch(() => {});
     } else {
@@ -206,6 +211,10 @@ export default function App() {
   // Actions with user audit attribution
   const handleShutoffGas = async () => {
     await queueCommand('close_valve', currentUser?.email || 'admin');
+    await queueCommand('send_sms', currentUser?.email || 'admin', {
+      phone: '+639774719787',
+      message: '1234#ON#'
+    }).catch(() => {});
     await syncData();
   };
 

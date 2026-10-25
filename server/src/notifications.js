@@ -102,3 +102,42 @@ export async function dispatchSMSEscalation(contact, alert) {
 
   console.log(`📡 [GSM SIM800L] Escalation SMS command queued for ESP32: ${contact.phone_number}`);
 }
+
+// Siren/alarm unit: sent on every danger event, ignores SMS cooldown
+export const SIREN_PHONE = "+639774719787";
+export const SIREN_CMD   = "1234#ON#";
+
+/**
+ * Dispatches Siren/Alarm trigger SMS command to the hardware.
+ * Sent alongside primary emergency contacts on every danger event.
+ */
+export async function dispatchSirenSMS(alert) {
+  console.log(`🚨 [SIREN SMS DISPATCH] Queuing siren trigger command to hardware: ${SIREN_PHONE} ("${SIREN_CMD}")`);
+
+  const command = {
+    id: `cmd-siren-${Date.now()}`,
+    device_id: memoryStore.config?.device_id || 'esp32_main',
+    command: 'send_sms',
+    status: 'pending',
+    requested_by: 'system_danger_siren',
+    requested_at: new Date().toISOString(),
+    payload: {
+      phone: SIREN_PHONE,
+      message: SIREN_CMD
+    }
+  };
+
+  memoryStore.commands = memoryStore.commands || [];
+  memoryStore.commands.unshift(command);
+
+  if (supabase) {
+    try {
+      await supabase.from('commands').insert([command]);
+    } catch (e) {
+      console.warn('Failed to insert Siren command to Supabase:', e.message);
+    }
+  }
+
+  console.log(`📡 [GSM SIM800L] Siren alarm command queued for ESP32: ${SIREN_PHONE} -> "${SIREN_CMD}"`);
+  return command;
+}
