@@ -1,5 +1,7 @@
 import webpush from 'web-push';
 import dotenv from 'dotenv';
+import { memoryStore, persistStore, supabase } from './db.js';
+
 dotenv.config();
 
 // VAPID keys for Web Push
@@ -14,16 +16,24 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   console.log('ℹ️ Web Push VAPID keys not set. Push notifications will run in simulation mode.');
 }
 
-// In-memory push subscriptions (browsers subscribed to alerts)
-export const pushSubscriptions = new Set();
+// Push subscriptions (browsers subscribed to alerts, restored from persistent store)
+export const pushSubscriptions = new Set(
+  Array.isArray(memoryStore.pushSubscriptions) ? memoryStore.pushSubscriptions : []
+);
 
 export function addPushSubscription(subscription) {
-  pushSubscriptions.add(JSON.stringify(subscription));
+  const subStr = JSON.stringify(subscription);
+  pushSubscriptions.add(subStr);
+  memoryStore.pushSubscriptions = Array.from(pushSubscriptions);
+  persistStore();
   console.log(`📱 New browser subscribed to Web Push. Total active subscribers: ${pushSubscriptions.size}`);
 }
 
 export function removePushSubscription(subscription) {
-  pushSubscriptions.delete(JSON.stringify(subscription));
+  const subStr = JSON.stringify(subscription);
+  pushSubscriptions.delete(subStr);
+  memoryStore.pushSubscriptions = Array.from(pushSubscriptions);
+  persistStore();
 }
 
 /**
@@ -50,11 +60,16 @@ export async function dispatchWebPushAlert(alert) {
   const sends = Array.from(pushSubscriptions).map(async (subStr) => {
     try {
       const sub = JSON.parse(subStr);
-      await webpush.sendNotification(sub, payload);
+      await webpush.sendNotification(sub, payload, {
+        TTL: 60,
+        urgency: 'high'
+      });
     } catch (err) {
       if (err.statusCode === 404 || err.statusCode === 410) {
         // Expired subscription
         pushSubscriptions.delete(subStr);
+        memoryStore.pushSubscriptions = Array.from(pushSubscriptions);
+        persistStore();
       } else {
         console.warn('Web push send error:', err.message);
       }
@@ -64,14 +79,22 @@ export async function dispatchWebPushAlert(alert) {
   await Promise.allSettled(sends);
 }
 
-import { memoryStore, supabase } from './db.js';
-
 /**
  * Dispatches Emergency SMS Escalation to contacts
  * Triggered when a Danger alert is unacknowledged past the timeout window
  */
 export async function dispatchSMSEscalation(contact, alert) {
-  const message = "WARNING: GAS LEAK DETECTED! LPG valve and main electrical power shut off as a precaution. Please check immediately";
+  const alertDate = alert?.created_at ? new Date(alert.created_at) : new Date();
+  const validDate = isNaN(alertDate.getTime()) ? new Date() : alertDate;
+  const timestamp = validDate.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+  const message = `WARNING: GAS LEAK DETECTED! LPG valve and main electrical power shut off as a precaution. Please check immediately. (${timestamp})`;
 
   console.log(`📱 [SMS ESCALATION DISPATCH] Sending SMS to ${contact.name} (${contact.phone_number}): "${message}"`);
 
