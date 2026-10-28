@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
+import {
   Home,
   SlidersHorizontal,
   Scan,
   MessageSquare,
   User,
-  Bell, 
-  Flame, 
+  Bell,
+  Flame,
   Wifi,
   Sparkles,
   Settings,
@@ -16,7 +16,8 @@ import {
   TrendingUp,
   ListTodo,
   LogOut,
-  UserCheck
+  UserCheck,
+  BellRing
 } from 'lucide-react';
 import ConnectionBadge from '../components/connection-badge';
 import PwaInstaller from '../components/pwa-installer';
@@ -26,17 +27,17 @@ import HistoryView from '../components/screens/history-view';
 import EventsView from '../components/screens/events-view';
 import AssistantView from '../components/screens/assistant-view';
 import SettingsView from '../components/screens/settings-view';
-import { 
-  fetchStatus, 
-  fetchReadings, 
-  fetchConfig, 
-  updateConfig, 
-  fetchAlerts, 
-  acknowledgeAlert, 
-  markFalseAlarm, 
-  fetchEvents, 
-  queueCommand, 
-  fetchContacts, 
+import {
+  fetchStatus,
+  fetchReadings,
+  fetchConfig,
+  updateConfig,
+  fetchAlerts,
+  acknowledgeAlert,
+  markFalseAlarm,
+  fetchEvents,
+  queueCommand,
+  fetchContacts,
   addContact,
   updateContact,
   deleteContact
@@ -64,7 +65,7 @@ export default function App() {
 
   const handleSwitchAccount = async (targetEmail) => {
     const all = getAllKnownAccounts();
-    const target = all.find(u => u.email.toLowerCase() === targetEmail.toLowerCase()) 
+    const target = all.find(u => u.email.toLowerCase() === targetEmail.toLowerCase())
       || AUTHORIZED_USERS.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
     if (target && target.password) {
       try {
@@ -111,6 +112,48 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [isBrowserOffline, setIsBrowserOffline] = useState(false);
+  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
+
+  // Auto-register Service Worker and synchronize Web Push on Android / Mobile mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(async (reg) => {
+        if ('Notification' in window) {
+          if (Notification.permission === 'granted') {
+            try {
+              const { syncPushSubscription } = await import('../lib/notifications');
+              await syncPushSubscription(reg);
+            } catch (e) {
+              console.warn('Push sync note:', e);
+            }
+          } else if (Notification.permission === 'default') {
+            const dismissed = sessionStorage.getItem('dismiss_notif_banner');
+            if (!dismissed) {
+              setShowNotificationBanner(true);
+            }
+          }
+        }
+      }).catch(err => console.warn('SW auto-registration note:', err));
+    }
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    try {
+      const { enableWebPushNotifications } = await import('../lib/notifications');
+      await enableWebPushNotifications();
+      setShowNotificationBanner(false);
+    } catch (err) {
+      alert(err.message || 'Notification permission was not granted');
+      setShowNotificationBanner(false);
+    }
+  };
+
+  const handleDismissNotificationBanner = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('dismiss_notif_banner', 'true');
+    }
+    setShowNotificationBanner(false);
+  };
 
   // Load cached config on initial mount so calibrations never flicker or reset
   useEffect(() => {
@@ -123,7 +166,7 @@ export default function App() {
             setConfig(prev => ({ ...prev, ...parsed }));
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
   }, []);
 
@@ -199,12 +242,12 @@ export default function App() {
           queueCommand('send_sms', currentUser?.email || 'mobile_app', {
             phone: '+639774719787',
             message: '1234#ON#'
-          }).catch(() => {});
+          }).catch(() => { });
         }
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
       lastDangerPopupRef.current = null;
-      import('@/lib/notifications').then(n => n.stopEmergencyAlarmChime()).catch(() => {});
+      import('@/lib/notifications').then(n => n.stopEmergencyAlarmChime()).catch(() => { });
     }
   }, [alerts]);
 
@@ -214,7 +257,7 @@ export default function App() {
     await queueCommand('send_sms', currentUser?.email || 'admin', {
       phone: '+639774719787',
       message: '1234#ON#'
-    }).catch(() => {});
+    }).catch(() => { });
     await syncData();
   };
 
@@ -224,7 +267,7 @@ export default function App() {
   };
 
   const handleAcknowledgeAlert = async (alertId) => {
-    import('@/lib/notifications').then(n => n.stopEmergencyAlarmChime()).catch(() => {});
+    import('@/lib/notifications').then(n => n.stopEmergencyAlarmChime()).catch(() => { });
     await acknowledgeAlert(alertId, currentUser?.email || 'admin');
     await syncData();
   };
@@ -300,10 +343,10 @@ export default function App() {
 
   useEffect(() => {
     setCurrentDateText(
-      new Date().toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        day: 'numeric', 
-        month: 'long' 
+      new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
       })
     );
   }, []);
@@ -369,11 +412,10 @@ export default function App() {
                   key={item.id}
                   type="button"
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${
-                    isActive
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all cursor-pointer ${isActive
                       ? 'bg-zinc-950 text-white shadow-md'
                       : 'text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3.5">
                     <Icon className={`w-5 h-5 ${isActive ? 'text-[#c8ff00]' : 'text-zinc-400'}`} />
@@ -392,9 +434,9 @@ export default function App() {
         <div className="pt-5 border-t border-zinc-100 space-y-4 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-zinc-400 font-medium">IoT Node Link</span>
-            <ConnectionBadge 
-              online={status.online} 
-              secondsSinceLastReading={status.secondsSinceLastReading} 
+            <ConnectionBadge
+              online={status.online}
+              secondsSinceLastReading={status.secondsSinceLastReading}
               offlineTimeout={config.offline_timeout_seconds}
             />
           </div>
@@ -405,11 +447,10 @@ export default function App() {
               <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
                 Operator Account
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                isSuperAdmin 
-                  ? 'bg-zinc-950 text-[#c8ff00]' 
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${isSuperAdmin
+                  ? 'bg-zinc-950 text-[#c8ff00]'
                   : 'bg-zinc-900 text-white'
-              }`}>
+                }`}>
                 {currentUser?.role}
               </span>
             </div>
@@ -471,8 +512,8 @@ export default function App() {
           {/* Header Right Actions */}
           <div className="flex items-center gap-2.5">
             <PwaInstaller />
-            <ConnectionBadge 
-              online={status.online} 
+            <ConnectionBadge
+              online={status.online}
               secondsSinceLastReading={status.secondsSinceLastReading}
               offlineTimeout={config.offline_timeout_seconds}
             />
@@ -503,6 +544,39 @@ export default function App() {
             </button>
           </div>
         </header>
+
+        {/* Android / Mobile Push Notification Enable Banner */}
+        {showNotificationBanner && (
+          <div className="max-w-4xl lg:max-w-5xl w-full mx-auto px-4 pt-4">
+            <div className="rounded-2xl bg-zinc-900 border border-zinc-700/80 p-4 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-[#c8ff00] text-zinc-950 font-bold shrink-0 shadow-sm">
+                  <BellRing className="w-5 h-5 text-zinc-950" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Enable Android Safety Alerts</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">Receive instant push notifications for gas leaks and fire danger even when your screen is locked.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDismissNotificationBanner}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Later
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEnableNotifications}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#c8ff00] hover:bg-[#b5e600] text-zinc-950 shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  Enable Alerts
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* View Content Body */}
         <main className="flex-1 p-4 md:p-8 max-w-4xl lg:max-w-5xl w-full mx-auto">
@@ -580,9 +654,8 @@ export default function App() {
               key={item.id}
               type="button"
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all cursor-pointer relative ${
-                isActive ? 'text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-600 font-medium'
-              }`}
+              className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all cursor-pointer relative ${isActive ? 'text-zinc-950 font-bold' : 'text-zinc-400 hover:text-zinc-600 font-medium'
+                }`}
             >
               <div className={`p-1 rounded-full transition-colors ${isActive ? 'text-zinc-950' : 'text-zinc-400'}`}>
                 <Icon className="w-5 h-5 stroke-[2.2]" />

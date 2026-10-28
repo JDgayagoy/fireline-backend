@@ -91,26 +91,18 @@ export default function StatusBanner({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 self-stretch md:self-auto">
-            {activeAlert && activeAlert.status === 'active' && (
+          {activeAlert && activeAlert.status === 'active' && (
+            <div className="flex items-center gap-3 shrink-0 self-stretch md:self-auto">
               <button
                 type="button"
                 onClick={() => onAcknowledge(activeAlert.id)}
-                className="flex-1 md:flex-initial h-11 px-5 rounded-full font-bold bg-white hover:bg-zinc-100 text-zinc-950 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-sm border border-zinc-200"
+                className="w-full md:w-auto h-11 px-5 rounded-full font-bold bg-white hover:bg-zinc-100 text-zinc-950 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-sm border border-zinc-200"
               >
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 Acknowledge Alert
               </button>
-            )}
-            <button
-              type="button"
-              onClick={onShutoffClick}
-              className="flex-1 md:flex-initial h-11 px-5 rounded-full font-bold bg-red-600 hover:bg-red-700 text-white shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
-            >
-              <AlertOctagon className="w-4 h-4" />
-              Shut Off Gas
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );

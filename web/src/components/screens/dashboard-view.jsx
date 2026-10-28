@@ -180,6 +180,8 @@ export default function DashboardView({
           <span className="text-zinc-600">MQ-2 Gas & Smoke</span>
           <span className="text-zinc-300">•</span>
           <span className="text-zinc-600">DHT11 Temp & Humidity</span>
+          <span className="text-zinc-300">•</span>
+          <span className="text-zinc-800 font-semibold">LPG Valve: Normally Open</span>
         </div>
       </div>
 

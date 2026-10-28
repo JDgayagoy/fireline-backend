@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Sliders, 
-  Users, 
-  Bell, 
+import {
+  Sliders,
+  Users,
+  Bell,
   BellRing,
-  ShieldCheck, 
-  Globe, 
-  Save, 
-  Plus, 
-  Phone, 
-  CheckCircle2, 
+  ShieldCheck,
+  Globe,
+  Save,
+  Plus,
+  Phone,
+  CheckCircle2,
   AlertTriangle,
   RotateCcw,
   LogOut,
@@ -26,12 +26,12 @@ import {
   Check,
   Pencil
 } from 'lucide-react';
-import { 
-  getNotificationPermission, 
-  enableWebPushNotifications, 
-  showSystemPopupNotification, 
-  playEmergencyAlarmChime, 
-  stopEmergencyAlarmChime 
+import {
+  getNotificationPermission,
+  enableWebPushNotifications,
+  showSystemPopupNotification,
+  playEmergencyAlarmChime,
+  stopEmergencyAlarmChime
 } from '../../lib/notifications';
 
 export default function SettingsView({
@@ -223,14 +223,22 @@ export default function SettingsView({
   };
 
   const handleTestPopup = async () => {
+    if (getNotificationPermission() !== 'granted') {
+      try {
+        await handleEnablePopupNotifications();
+        return;
+      } catch (_) {
+        return;
+      }
+    }
     const success = await showSystemPopupNotification({
       title: '🚨 FireLine Emergency Alert Test',
-      body: 'Verified: System popup notification banner is functioning properly on this device.',
+      body: 'Verified: System popup notification banner is functioning properly on this Android/browser device.',
       tag: 'test-popup'
     });
 
     if (!success) {
-      alert('Please enable popup notifications first using the "Turn On Background Popups" button.');
+      alert('Notification was not displayed. Please check that notifications are allowed in your Android browser/site settings.');
     }
   };
 
@@ -247,11 +255,10 @@ export default function SettingsView({
               <h2 className="text-base font-black text-zinc-950">
                 {currentUser?.name || (isSuperAdmin ? 'Super Admin' : 'Safety Admin')}
               </h2>
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                isSuperAdmin 
-                  ? 'bg-zinc-950 text-[#c8ff00] border border-zinc-800' 
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isSuperAdmin
+                  ? 'bg-zinc-950 text-[#c8ff00] border border-zinc-800'
                   : 'bg-zinc-100 text-zinc-800'
-              }`}>
+                }`}>
                 {currentUser?.role || (isSuperAdmin ? 'superadmin' : 'admin')}
               </span>
             </div>
@@ -301,11 +308,10 @@ export default function SettingsView({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-black text-zinc-950">System Popup Notifications & Alerts</h3>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                  notificationPerm === 'granted'
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${notificationPerm === 'granted'
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                     : 'bg-amber-100 text-amber-800 border border-amber-200'
-                }`}>
+                  }`}>
                   {notificationPerm === 'granted' ? '● Popups Active' : '○ Popups Disabled'}
                 </span>
               </div>
@@ -652,28 +658,25 @@ export default function SettingsView({
               return (
                 <div
                   key={contact.id || idx}
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border transition-all gap-3 ${
-                    isPrimary 
-                      ? 'border-emerald-200/90 bg-emerald-50/30 shadow-sm' 
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border transition-all gap-3 ${isPrimary
+                      ? 'border-emerald-200/90 bg-emerald-50/30 shadow-sm'
                       : 'border-zinc-200/70 bg-zinc-50/70'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 mt-0.5 ${
-                      isPrimary 
-                        ? 'bg-emerald-500 text-white shadow-sm' 
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 mt-0.5 ${isPrimary
+                        ? 'bg-emerald-500 text-white shadow-sm'
                         : 'bg-zinc-200 text-zinc-700'
-                    }`}>
+                      }`}>
                       {isPrimary ? <Star className="w-4 h-4 fill-white" /> : (idx + 1)}
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <h4 className="text-sm font-black text-zinc-900">{contact.name}</h4>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          isPrimary
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${isPrimary
                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                             : 'bg-blue-100 text-blue-800 border border-blue-200'
-                        }`}>
+                          }`}>
                           {isPrimary ? '★ Primary (Instant SMS)' : '⏱ Secondary (Escalation Backup)'}
                         </span>
                       </div>
@@ -690,11 +693,10 @@ export default function SettingsView({
                       <button
                         type="button"
                         onClick={() => handleTogglePriority(contact)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
-                          isPrimary
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${isPrimary
                             ? 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200'
                             : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                        }`}
+                          }`}
                         title={isPrimary ? 'Demote to Secondary backup' : 'Promote to Primary immediate responder'}
                       >
                         <Star className={`w-3.5 h-3.5 ${isPrimary ? 'text-amber-500 fill-amber-500' : 'text-emerald-600'}`} />
@@ -804,11 +806,10 @@ export default function SettingsView({
                   <button
                     type="button"
                     onClick={() => setNewContact({ ...newContact, priority: 1, relationship: newContact.relationship || 'Primary Safety Contact' })}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      Number(newContact.priority) === 1
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${Number(newContact.priority) === 1
                         ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm ring-2 ring-emerald-500/20'
                         : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-600'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-1.5 font-black text-xs">
                       <Star className={`w-3.5 h-3.5 ${Number(newContact.priority) === 1 ? 'fill-emerald-600 text-emerald-600' : 'text-zinc-400'}`} />
@@ -822,11 +823,10 @@ export default function SettingsView({
                   <button
                     type="button"
                     onClick={() => setNewContact({ ...newContact, priority: 2, relationship: newContact.relationship || 'Secondary Escalation Contact' })}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      Number(newContact.priority) > 1
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${Number(newContact.priority) > 1
                         ? 'border-blue-500 bg-blue-50 text-blue-950 shadow-sm ring-2 ring-blue-500/20'
                         : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-600'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-1.5 font-black text-xs">
                       <ShieldAlert className={`w-3.5 h-3.5 ${Number(newContact.priority) > 1 ? 'text-blue-600' : 'text-zinc-400'}`} />

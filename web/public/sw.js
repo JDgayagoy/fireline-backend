@@ -1,7 +1,7 @@
 // Service Worker for Gas & Fire Monitor PWA
 // Handles asset caching and Web Push notifications
 
-const CACHE_NAME = 'gas-fire-monitor-v1';
+const CACHE_NAME = 'gas-fire-monitor-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json'
@@ -9,7 +9,11 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
+        console.warn('Cache prefill warning (non-fatal):', err);
+      });
+    })
   );
   self.skipWaiting();
 });
@@ -59,7 +63,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ----------------------------------------------------------------------------
-// Web Push Notifications
+// Web Push Notifications (Android Chrome & PWA Native Banners)
 // ----------------------------------------------------------------------------
 self.addEventListener('push', (event) => {
   let data = {};
@@ -67,7 +71,7 @@ self.addEventListener('push', (event) => {
     try {
       data = event.data.json();
     } catch (e) {
-      data = { title: 'Safety Alert', body: event.data.text() };
+      data = { title: '🚨 FireLine Safety Alert', body: event.data.text() };
     }
   }
 
@@ -76,10 +80,11 @@ self.addEventListener('push', (event) => {
     body: data.body || 'Elevated sensor reading recorded.',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: data.tag || 'gas-alert',
-    vibrate: [300, 100, 300, 100, 300],
+    tag: data.tag || 'fireline-alert',
+    renotify: true,
+    vibrate: [500, 200, 500, 200, 500],
     data: data.data || { url: '/' },
-    requireInteraction: true // Keeps danger alert visible until dismissed
+    timestamp: Date.now()
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -92,7 +97,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
-        if (client.url.includes(urlToOpen) && 'focus' in client) {
+        if ('focus' in client) {
           return client.focus();
         }
       }
@@ -110,8 +115,8 @@ self.addEventListener('message', (event) => {
       self.registration.showNotification(title || '🚨 FireLine Safety Alert', {
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        vibrate: [400, 150, 400],
-        requireInteraction: true,
+        vibrate: [500, 200, 500],
+        renotify: true,
         ...options
       })
     );

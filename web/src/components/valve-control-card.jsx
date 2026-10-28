@@ -55,8 +55,13 @@ export default function ValveControlCard({
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white text-zinc-950 flex items-center justify-center shadow-md">
             {isClosed ? <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" /> : <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-950" />}
           </div>
-          <div className="text-zinc-500">
-            <Wifi className="w-4 h-4 text-zinc-400/80" />
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60 font-semibold">
+              Normally Open (NO)
+            </span>
+            <div className="text-zinc-500">
+              <Wifi className="w-4 h-4 text-zinc-400/80" />
+            </div>
           </div>
         </div>
 
@@ -66,7 +71,7 @@ export default function ValveControlCard({
             LPG Gas Valve
           </h3>
           <p className="text-[11px] sm:text-xs text-zinc-400 mt-0.5 truncate">
-            CW-025 Actuator • 12V
+            Normally Open (NO) • 12V Actuator
           </p>
         </div>
       </div>
@@ -88,8 +93,10 @@ export default function ValveControlCard({
           <span className="text-sm font-bold tracking-wide">
             {isClosed ? 'Off' : 'On'}
           </span>
-          <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
-            {isClosed ? 'Closed' : 'Armed'}
+          <span className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded-full ${
+            isClosed ? 'bg-red-950/80 text-red-300 border border-red-800' : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+          }`}>
+            {isClosed ? 'Closed' : 'Normally Open'}
           </span>
         </div>
 
@@ -121,7 +128,6 @@ export default function ValveControlCard({
         )}
       </div>
 
-      {/* Last Action Timestamp */}
       {lastValveEvent && (
         <div className="mt-3 text-[11px] text-zinc-500 flex items-center justify-between">
           <span className="truncate pr-2">{lastValveEvent.summary}</span>
@@ -143,7 +149,7 @@ export default function ValveControlCard({
             </div>
 
             <p className="text-sm text-zinc-300 leading-relaxed mb-6">
-              This sends a cloud command to the ESP32 to de-energize the CW-025 relay and snap the LPG solenoid valve shut. Gas supply will halt immediately.
+              This sends a cloud command to the ESP32 to actuate the relay and shut off the normally-open LPG gas valve. Gas supply will halt immediately.
             </p>
 
             {isPending ? (

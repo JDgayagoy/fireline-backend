@@ -33,55 +33,111 @@ export function getNotificationPermission() {
 export async function enableWebPushNotifications() {
   if (typeof window === 'undefined') return { success: false };
 
-  if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+  if (!('Notification' in window)) {
     throw new Error('System popup notifications are not supported by this browser.');
   }
 
   // 1. Request native OS permission
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    throw new Error('Notification permission was denied. Please allow notifications in browser site settings.');
+    throw new Error('Notification permission was denied. Please allow notifications in site settings or Android app permissions.');
   }
 
   // 2. Register Service Worker
-  const registration = await navigator.serviceWorker.register('/sw.js');
-  await navigator.serviceWorker.ready;
+  let registration = null;
+  if ('serviceWorker' in navigator) {
+    registration = await navigator.serviceWorker.register('/sw.js');
+    try {
+      await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((resolve) => setTimeout(resolve, 2500))
+      ]);
+    } catch (e) {
+      // Non-fatal
+    }
+  }
 
   let subscription = null;
 
   // 3. Subscribe to Web Push if VAPID key is configured
-  if (VAPID_PUBLIC_KEY && 'PushManager' in window) {
+  if (registration && VAPID_PUBLIC_KEY && 'PushManager' in window) {
     try {
       const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey
-      });
+      subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey
+        });
+      }
 
       // Post subscription to backend API
-      await fetch(`${API_BASE}/push/subscribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscription)
-      }).catch((e) => console.warn('Failed to register subscription with backend:', e.message));
+      if (subscription) {
+        await fetch(`${API_BASE}/push/subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(subscription)
+        }).catch((e) => console.warn('Failed to register subscription with backend:', e.message));
+      }
     } catch (pushErr) {
       console.warn('Push subscription note:', pushErr.message);
     }
   }
 
-  // 4. Send an immediate native OS test popup confirmation
-  await showSystemPopupNotification({
-    title: '🔔 FireLine Safety Popups Active',
-    body: 'You will now receive instant system banners even when the app is minimized or running in the background.',
-    tag: 'fireline-welcome'
-  });
+  // 4. Send an immediate native OS test popup confirmation via Service Worker (Android compatible)
+  const origin = window.location.origin;
+  if (registration && registration.showNotification) {
+    try {
+      await registration.showNotification('🔔 FireLine Safety Popups Active', {
+        body: 'You will now receive instant system banners even when the app is minimized or running in the background.',
+        icon: `${origin}/icon-192.png`,
+        badge: `${origin}/icon-192.png`,
+        tag: 'fireline-welcome',
+        vibrate: [300, 100, 300]
+      });
+    } catch (swErr) {
+      console.warn('SW welcome notification note:', swErr);
+    }
+  } else {
+    await showSystemPopupNotification({
+      title: '🔔 FireLine Safety Popups Active',
+      body: 'You will now receive instant system banners even when the app is minimized or running in the background.',
+      tag: 'fireline-welcome'
+    });
+  }
 
   return { success: true, permission, subscription };
 }
 
 /**
+ * Synchronize push subscription with backend on page mount
+ */
+export async function syncPushSubscription(registration) {
+  if (!registration || !('pushManager' in registration) || !VAPID_PUBLIC_KEY) return;
+  try {
+    let sub = await registration.pushManager.getSubscription();
+    if (!sub) {
+      const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey
+      });
+    }
+    if (sub) {
+      await fetch(`${API_BASE}/push/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub)
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.warn('Auto-sync subscription note:', err);
+  }
+}
+
+/**
  * Displays an immediate Native OS System Popup Banner
- * (Windows Action Center banner / Android lockscreen / macOS notification)
+ * (Windows Action Center banner / Android lockscreen & status bar / macOS notification)
  */
 export async function showSystemPopupNotification({
   title = '🚨 Gas & Fire Safety Alert',
@@ -92,48 +148,73 @@ export async function showSystemPopupNotification({
   requireInteraction = true,
   data = { url: '/' }
 } = {}) {
-  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+  if (typeof window === 'undefined') return false;
+
+  if (!('Notification' in window)) {
+    console.warn('Notifications not supported by this browser.');
+    return false;
+  }
 
   if (Notification.permission !== 'granted') {
     return false;
   }
 
+  const origin = window.location.origin;
+  const fullIcon = icon.startsWith('http') ? icon : `${origin}${icon}`;
+  const fullBadge = badge.startsWith('http') ? badge : `${origin}${badge}`;
+
   const options = {
     body,
-    icon,
-    badge,
-    tag,
-    vibrate: [400, 150, 400, 150, 400],
-    requireInteraction, // Keeps notification on screen until user acts
+    icon: fullIcon,
+    badge: fullBadge,
+    tag: String(tag || 'fireline-alert'),
+    vibrate: [500, 200, 500, 200, 500],
     renotify: true,
-    data
+    data: data || { url: '/' }
   };
 
-  // Method 1: Use Service Worker registration (Works reliably in background / PWA mode)
+  // Method 1: Use Service Worker registration (Mandatory on Android Chrome)
   if ('serviceWorker' in navigator) {
     try {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && reg.showNotification) {
-        await reg.showNotification(title, options);
-        return true;
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        reg = await navigator.serviceWorker.register('/sw.js');
+      }
+
+      if (reg) {
+        if (!reg.active) {
+          await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((resolve) => setTimeout(resolve, 2000))
+          ]);
+        }
+
+        if (reg.showNotification) {
+          await reg.showNotification(title, options);
+          return true;
+        }
       }
     } catch (swErr) {
-      console.warn('Service worker notification fallback:', swErr);
+      console.warn('Service worker showNotification fallback:', swErr);
     }
   }
 
-  // Method 2: Standard Notification constructor fallback
+  // Method 2: Standard Notification constructor fallback (Desktop Chrome/Firefox/Safari)
+  // Note: On Android Chrome, calling new Notification() throws TypeError by browser design
   try {
-    const notification = new Notification(title, options);
-    notification.onclick = () => {
-      window.focus();
-      notification.close();
-    };
-    return true;
+    if (typeof Notification === 'function') {
+      const notification = new Notification(title, options);
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+      return true;
+    }
   } catch (err) {
-    console.warn('Notification constructor error:', err);
-    return false;
+    console.warn('Notification constructor fallback failed (expected on Android Chrome):', err.message);
   }
+
+  return false;
 }
 
 /**

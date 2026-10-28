@@ -14,8 +14,8 @@ const STORE_FILE = path.join(DATA_DIR, 'store.json');
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 
-export const supabase = (supabaseUrl && supabaseKey) 
-  ? createClient(supabaseUrl, supabaseKey) 
+export const supabase = (supabaseUrl && supabaseKey)
+  ? createClient(supabaseUrl, supabaseKey)
   : null;
 
 if (supabase) {
@@ -97,7 +97,8 @@ export function persistStore() {
     const dataToSave = {
       config: memoryStore.config,
       contacts: memoryStore.contacts,
-      events: memoryStore.events.slice(0, 50)
+      events: memoryStore.events.slice(0, 50),
+      pushSubscriptions: memoryStore.pushSubscriptions || []
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(dataToSave, null, 2), 'utf-8');
   } catch (err) {
@@ -120,6 +121,10 @@ export function loadPersistedStore() {
       }
       if (parsed.events && Array.isArray(parsed.events)) {
         memoryStore.events = parsed.events;
+      }
+      if (parsed.pushSubscriptions && Array.isArray(parsed.pushSubscriptions)) {
+        memoryStore.pushSubscriptions = parsed.pushSubscriptions;
+        console.log(`📱 Loaded ${parsed.pushSubscriptions.length} persisted push subscription(s) from disk`);
       }
     } else {
       // Create initial store file

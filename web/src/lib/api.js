@@ -20,7 +20,7 @@ export async function fetchConfig() {
       if (typeof window !== 'undefined' && data) {
         try {
           localStorage.setItem('cached_config', JSON.stringify(data));
-        } catch (_) {}
+        } catch (_) { }
       }
       return data;
     }
@@ -36,7 +36,7 @@ export async function fetchConfig() {
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('cached_config', JSON.stringify(data));
-          } catch (_) {}
+          } catch (_) { }
         }
         return data;
       }
@@ -53,7 +53,7 @@ export async function fetchConfig() {
         const parsed = JSON.parse(cached);
         if (parsed && typeof parsed === 'object') return parsed;
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return {
@@ -81,11 +81,11 @@ export async function updateConfig(data) {
       const existing = JSON.parse(localStorage.getItem('cached_config') || '{}');
       const merged = { ...existing, ...data };
       localStorage.setItem('cached_config', JSON.stringify(merged));
-      
+
       if (Array.isArray(data.contacts)) {
         localStorage.setItem('cached_contacts', JSON.stringify(data.contacts));
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   try {
@@ -99,12 +99,12 @@ export async function updateConfig(data) {
       if (result.config && typeof window !== 'undefined') {
         try {
           localStorage.setItem('cached_config', JSON.stringify(result.config));
-        } catch (_) {}
+        } catch (_) { }
       }
       if (result.contacts && typeof window !== 'undefined') {
         try {
           localStorage.setItem('cached_contacts', JSON.stringify(result.contacts));
-        } catch (_) {}
+        } catch (_) { }
       }
       return result;
     }
@@ -245,7 +245,7 @@ All zones are normal and protected by autonomous hardware shutoff routines.`;
     const valveState = status.valveState?.toUpperCase() || 'OPEN';
     return `### 🛑 Emergency Solenoid Valve: **${valveState}**
 
-- **Current State:** The emergency gas shutoff valve is **${valveState}**.
+- **Current State:** The emergency gas shutoff valve is Normally Open (NO) and is currently **${valveState}**.
 - **Hardware Link:** ESP32 safety node is **${status.online ? 'ONLINE' : 'OFFLINE'}** (${status.firmware_version || 'v1.2.0-esp32'}).
 - **Automatic Failsafe:** Shuts off automatically if gas crosses **${config.gas_danger_threshold || 300} PPM** or temperature crosses **${config.temp_danger_threshold || 60}°C**.
 - **Manual Control:** Administrators can command remote shutoff or reopening with audit confirmation directly from the dashboard.`;
@@ -365,7 +365,7 @@ export async function fetchContacts() {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const defaultContacts = [
@@ -389,7 +389,7 @@ export async function fetchContacts() {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem('cached_contacts', JSON.stringify(defaultContacts));
-    } catch (_) {}
+    } catch (_) { }
   }
   return defaultContacts;
 }
@@ -412,7 +412,7 @@ export async function addContact(contact) {
         local.push(contactWithId);
       }
       localStorage.setItem('cached_contacts', JSON.stringify(local));
-    } catch (_) {}
+    } catch (_) { }
   }
 
   try {
@@ -433,7 +433,7 @@ export async function addContact(contact) {
             local.push(saved);
           }
           localStorage.setItem('cached_contacts', JSON.stringify(local));
-        } catch (_) {}
+        } catch (_) { }
       }
       return saved;
     }
@@ -463,7 +463,7 @@ export async function updateContact(id, updates) {
         local[idx] = { ...local[idx], ...updates };
         localStorage.setItem('cached_contacts', JSON.stringify(local));
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   try {
@@ -482,7 +482,7 @@ export async function updateContact(id, updates) {
             local[idx] = saved;
             localStorage.setItem('cached_contacts', JSON.stringify(local));
           }
-        } catch (_) {}
+        } catch (_) { }
       }
       return saved;
     }
@@ -510,7 +510,7 @@ export async function deleteContact(id) {
       const local = JSON.parse(localStorage.getItem('cached_contacts') || '[]');
       const updated = local.filter(c => String(c.id) !== String(id));
       localStorage.setItem('cached_contacts', JSON.stringify(updated));
-    } catch (_) {}
+    } catch (_) { }
   }
 
   try {
