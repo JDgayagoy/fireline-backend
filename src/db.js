@@ -64,7 +64,7 @@ export const memoryStore = {
     {
       id: '11111111-1111-1111-1111-111111111111',
       name: 'Primary Admin (Home)',
-      phone_number: '+639774719787',
+      phone_number: '+639661899935',
       relationship: 'Primary Safety Operator',
       priority: 1,
       is_active: true
