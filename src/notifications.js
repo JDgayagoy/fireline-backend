@@ -127,7 +127,7 @@ export async function dispatchSMSEscalation(contact, alert) {
 }
 
 // Siren/alarm unit: sent on every danger event, ignores SMS cooldown
-export const SIREN_PHONE = "+639774719787";
+export const SIREN_PHONE = "+639661899935";
 export const SIREN_CMD   = "1234#ON#";
 
 /**
