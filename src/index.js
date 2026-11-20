@@ -436,8 +436,10 @@ app.post('/api/readings', async (req, res) => {
           dispatchSMSEscalation(contact, dangerAlert).catch(err => console.error('Primary SMS dispatch error:', err));
         }
 
-        // Alongside primary: immediately dispatch siren alarm command (+639661899935: "1234#ON#")
-        dispatchSirenSMS(dangerAlert).catch(err => console.error('Siren SMS dispatch error:', err));
+        // Delay siren command by 8 seconds so primary contact SMS command is polled and sent first by ESP32
+        setTimeout(() => {
+          dispatchSirenSMS(dangerAlert).catch(err => console.error('Siren SMS dispatch error:', err));
+        }, 8000);
       }
     } else if (isGasWatch || isTempWatch) {
       // Watch Alert Trigger
@@ -645,9 +647,11 @@ app.post('/api/commands/:id/result', async (req, res) => {
 // Config (Device Thresholds & Settings)
 // ----------------------------------------------------------------------------
 app.get('/api/config', (req, res) => {
+  const primary = (memoryStore.contacts || []).find(c => c.is_active !== false && Number(c.priority) === 1 && c.phone_number);
   res.json({
     ...memoryStore.config,
-    gas_adc_danger_threshold: memoryStore.config.gas_adc_danger_threshold || memoryStore.config.gas_danger_threshold
+    gas_adc_danger_threshold: memoryStore.config.gas_adc_danger_threshold || memoryStore.config.gas_danger_threshold,
+    primary_phone: primary ? primary.phone_number : null
   });
 });
 
