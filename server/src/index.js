@@ -436,7 +436,7 @@ app.post('/api/readings', async (req, res) => {
           dispatchSMSEscalation(contact, dangerAlert).catch(err => console.error('Primary SMS dispatch error:', err));
         }
 
-        // Alongside primary: immediately dispatch siren alarm command (+639774719787: "1234#ON#")
+        // Alongside primary: immediately dispatch siren alarm command (+639661899935: "1234#ON#")
         dispatchSirenSMS(dangerAlert).catch(err => console.error('Siren SMS dispatch error:', err));
       }
     } else if (isGasWatch || isTempWatch) {
